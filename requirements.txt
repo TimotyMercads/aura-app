@@ -1,0 +1,17 @@
+Flask>=3.0
+Flask-Login>=0.6
+# The model (models/AURA_model_bundle.pkl) was trained with scikit-learn 1.6.1
+# and pandas 2.2.3 - keep these versions so the pickle loads exactly as trained.
+scikit-learn==1.6.1
+pandas>=2.2.3,<3
+numpy>=1.26,<3
+joblib>=1.4
+openpyxl>=3.1
+# Exact SHAP explanations (TreeExplainer) - the notebook used shap 0.52.0
+shap>=0.46
+SQLAlchemy>=2.0
+PyMySQL>=1.1
+psycopg2-binary>=2.9
+cryptography>=42.0
+python-dotenv>=1.0
+gunicorn>=22.0

@@ -1,0 +1,18 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+
+# Uploaded data & trained model artifacts - keep out of version control
+data/*.csv
+data/*.xlsx
+data/upload_history.json
+data/last_clean_report.json
+# The deployable model MUST be committed so Render/Vercel can load it.
+# (Ignore any other experimental .pkl files you drop in /models.)
+models/*.pkl
+!models/AURA_model_bundle.pkl
+
+!data/.gitkeep
+!models/.gitkeep

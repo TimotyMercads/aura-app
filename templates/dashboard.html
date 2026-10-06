@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+
+<div class="welcome-banner torch-glow">
+    <div class="eyebrow">Dashboard</div>
+    <h1>Welcome back, {{ current_user.full_name.split(' ')[0] if current_user.is_authenticated else "Teacher" }} 👋</h1>
+    <p>Here's how your students are doing today.</p>
+</div>
+
+{% if action_plan_alerts %}
+<div class="alert-banner">
+    <span>🔔 You have <strong>{{ action_plan_alerts }}</strong> action item(s) overdue or due within 7 days.</span>
+    <a href="{{ url_for('recommendations') }}">Review Action Plan →</a>
+</div>
+{% endif %}
+
+<div class="flex-between mb-20">
+    <h3 style="font-size:16px; color:var(--text-muted); font-weight:600;">At a Glance</h3>
+    <a href="{{ url_for('upload') }}" class="btn">📂 Upload Dataset</a>
+</div>
+
+<div class="cards cards-4">
+    <div class="card">
+        <h4>👥 Total Students</h4>
+        <h2>{{ "{:,}".format(stats.total) }}</h2>
+    </div>
+    <div class="card green">
+        <h4>✅ High-Performing</h4>
+        <h2>{{ "{:,}".format(stats.high_performing) if stats.high_performing is not none else "—" }}</h2>
+    </div>
+    <div class="card blue">
+        <h4>➖ Stable</h4>
+        <h2>{{ "{:,}".format(stats.stable) if stats.stable is not none else "—" }}</h2>
+    </div>
+    <div class="card red">
+        <h4>⚠️ At-Risk</h4>
+        <h2>{{ "{:,}".format(stats.at_risk) if stats.at_risk is not none else "—" }}</h2>
+    </div>
+</div>
+
+<div class="graph-box">
+    <h3>Performance Distribution</h3>
+    {% if stats.source == "prediction" %}
+        <p class="text-muted mb-10">Classified by the AI model ({{ model_name or "selected model" }}). These are non-binding predictions to support — not replace — your judgment.</p>
+    {% elif stats.source == "recorded" %}
+        <p class="text-muted mb-10">Showing the recorded classes from the uploaded file (no model loaded).</p>
+    {% endif %}
+    {% if stats.high_performing is not none %}
+        <div class="chart-wrap chart-wrap-sm">
+            <canvas id="performanceChart"></canvas>
+        </div>
+    {% else %}
+        <div class="chart-placeholder">Upload a dataset to see this chart</div>
+    {% endif %}
+</div>
+
+<div class="table-container">
+    <table>
+        <thead>
+            <tr>
+                <th>Student ID</th>
+                <th>Program</th>
+                <th>Year Level</th>
+                <th>GWA</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% if students %}
+            {% for s in students %}
+            <tr>
+                <td>{{ s.id }}</td>
+                <td>{{ s.program }}</td>
+                <td>{{ s.year_level }}</td>
+                <td>{{ "%.2f"|format(s.gwa) if s.gwa is not none else "—" }}</td>
+                <td><span class="badge {{ s.status_class }}">{{ s.status_text }}</span></td>
+            </tr>
+            {% endfor %}
+        {% else %}
+            <tr><td colspan="5">No students yet — <a href="{{ url_for('upload') }}">upload a dataset</a> to populate this table.</td></tr>
+        {% endif %}
+        </tbody>
+    </table>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+{% if stats.high_performing is not none %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+new Chart(document.getElementById('performanceChart'), {
+    type: 'bar',
+    data: {
+        labels: ['High-Performing', 'Stable', 'At-Risk'],
+        datasets: [{
+            data: [{{ stats.high_performing }}, {{ stats.stable }}, {{ stats.at_risk }}],
+            backgroundColor: ['#57B27F', '#3E6FA8', '#9C3A56'],
+            borderRadius: 6,
+        }]
+    },
+    options: {
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+            y: { beginAtZero: true, ticks: { color: '#93A1BC' }, grid: { color: 'rgba(255,255,255,.06)' } },
+            x: { ticks: { color: '#93A1BC' }, grid: { display: false } }
+        }
+    }
+});
+</script>
+{% endif %}
+{% endblock %}

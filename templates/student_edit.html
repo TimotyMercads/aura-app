@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Edit Student{% endblock %}
+
+{% block content %}
+
+<a href="{{ url_for('student_insight', student_id=student.id) }}" class="back-link">← Back to Student</a>
+
+<div class="flex-between mb-20">
+    <h1 class="page-title mb-0">Edit Student: {{ student.id }}</h1>
+</div>
+
+<p class="text-muted mb-20">
+    Changes save directly to your uploaded data, and the student is re-classified by the model right after saving.
+    You can only edit students from datasets you uploaded yourself.
+</p>
+
+<form method="post" action="{{ url_for('student_edit', student_id=student.id) }}">
+    <div class="insight-card">
+        <div class="edit-grid">
+            {% for field in edit_fields %}
+            <div class="edit-field">
+                <label>{{ field.label }}</label>
+                {% if field.type == "select" %}
+                <select name="{{ field.name }}">
+                    <option value="" {{ "selected" if field.value == "" }}>—</option>
+                    {% for opt in field.options %}
+                    <option value="{{ opt }}" {{ "selected" if field.value|string == opt|string }}>{{ opt }}</option>
+                    {% endfor %}
+                </select>
+                {% else %}
+                <input type="{{ field.type }}" name="{{ field.name }}" value="{{ field.value }}" {% if field.step %}step="{{ field.step }}"{% endif %}>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="mt-30">
+            <button type="submit" class="btn">Save Changes</button>
+            <a href="{{ url_for('student_insight', student_id=student.id) }}" class="btn btn-warning">Cancel</a>
+        </div>
+    </div>
+</form>
+
+{% endblock %}

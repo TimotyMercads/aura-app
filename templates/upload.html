@@ -1,0 +1,246 @@
+{% extends "base.html" %}
+{% block title %}Upload Dataset{% endblock %}
+
+{% block content %}
+
+<h1 class="page-title">Upload Dataset</h1>
+
+<div class="upload-box" id="upload-box">
+    <h2>Upload CSV or XLSX Dataset</h2>
+    <p>Select a student file matching the AURA AY 2025-2026 dataset schema (for an .xlsx workbook, the <code>dataset</code> sheet is read).</p>
+
+    <form method="post" enctype="multipart/form-data" action="{{ url_for('upload') }}" id="upload-form">
+        <label class="upload-btn" for="dataset">Choose File</label>
+        <input type="file" id="dataset" name="dataset" accept=".csv,.xlsx,.xls" required>
+
+        <div>
+            <div class="file-chosen" id="file-chosen" aria-live="polite">
+                <span class="file-chosen-icon">📄</span>
+                <span class="file-chosen-name" id="file-chosen-name">No file chosen</span>
+                <span class="file-chosen-size" id="file-chosen-size"></span>
+            </div>
+        </div>
+
+        <div class="mt-30">
+            <button class="btn" type="submit" id="upload-submit">Upload Dataset</button>
+        </div>
+    </form>
+
+    {% set active = (history | selectattr("is_active") | list | first) if history else none %}
+    {% if active and has_dataset %}
+    <div class="file-loaded">
+        ✅ Currently loaded: <strong>{{ active.filename }}</strong>
+        — {{ "{:,}".format(active.row_count) }} records{% if active.uploaded_at %} · uploaded {{ active.uploaded_at.strftime('%b %d, %Y %I:%M %p') }}{% endif %}
+    </div>
+    {% endif %}
+
+    <p class="text-muted mt-20">
+        Required columns: {% for c in required_columns %}<code>{{ c }}</code>{{ ", " if not loop.last }}{% endfor %}.
+        <code>target_class</code> is optional — unlabeled students are classified by the model.
+    </p>
+</div>
+
+<div class="graph-box mt-30">
+    <h3>Uploaded Files</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Filename</th>
+                <th>Type</th>
+                <th>Records</th>
+                <th>Uploaded By</th>
+                <th>Uploaded</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% if history %}
+            {% for h in history %}
+            <tr>
+                <td>{{ h.filename }}</td>
+                <td><span class="file-type-badge">{{ h.file_type }}</span></td>
+                <td>{{ "{:,}".format(h.row_count) }}</td>
+                <td>{{ h.uploaded_by_name or "Unknown" }}</td>
+                <td>{{ h.uploaded_at.strftime('%b %d, %Y %I:%M %p') if h.uploaded_at else "—" }}</td>
+                <td>
+                    {% if h.is_active %}
+                        <span class="badge badge-success">Active</span>
+                    {% else %}
+                        <span class="badge badge-warning">Replaced</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        {% else %}
+            <tr><td colspan="6">No uploads yet.</td></tr>
+        {% endif %}
+        </tbody>
+    </table>
+</div>
+
+<div class="graph-box mt-30">
+    <div class="card-header-row">
+        <h3>Download Dataset</h3>
+    </div>
+    <p class="text-muted mb-20">
+        Export the currently loaded (cleaned) dataset, optionally enriched with
+        computed columns (GWA, attendance %, LMS activity level, and the AI's
+        predicted class, confidence and At-Risk probability if the model is loaded).
+    </p>
+    {% if has_dataset %}
+    <a href="{{ url_for('download_dataset') }}" class="btn">Download Cleaned Dataset (CSV)</a>
+    <a href="{{ url_for('download_dataset_enriched') }}" class="btn">Download Enriched Dataset (CSV)</a>
+    {% else %}
+    <p class="text-muted">Upload a dataset first to enable downloads.</p>
+    {% endif %}
+</div>
+
+{% if clean_report %}
+<div class="graph-box mt-30">
+    <h3>Last Cleaning Report</h3>
+    <p class="text-muted mb-20">
+        {{ clean_report.filename }} — cleaned {{ clean_report.cleaned_at }} —
+        {{ "{:,}".format(clean_report.original_rows) }} rows in,
+        {{ "{:,}".format(clean_report.final_rows) }} rows out.
+    </p>
+    <ul class="model-file-list">
+        <li>Empty rows removed: <strong>{{ clean_report.empty_rows_removed }}</strong></li>
+        <li>Exact duplicate rows removed: <strong>{{ clean_report.duplicate_rows_removed }}</strong></li>
+        <li>Duplicate Student IDs removed (kept first): <strong>{{ clean_report.duplicate_ids_removed }}</strong></li>
+        <li>Excluded — missing a critical model input: <strong>{{ clean_report.excluded_missing_critical or 0 }}</strong></li>
+        <li>Excluded — more than 20% of attributes missing: <strong>{{ clean_report.excluded_too_many_missing or 0 }}</strong></li>
+        {% if clean_report.sheet %}
+        <li>Sheet read: <strong>{{ clean_report.sheet }}</strong></li>
+        {% endif %}
+        {% if clean_report.columns_renamed %}
+        <li>Columns matched to the schema:
+            {% for old, new in clean_report.columns_renamed.items() %}
+                <strong>{{ old }}</strong> → {{ new }}{{ ", " if not loop.last }}
+            {% endfor %}
+        </li>
+        {% endif %}
+        {% if clean_report.demographic_columns_removed %}
+        <li>Demographic columns removed (outside study scope): <strong>{{ clean_report.demographic_columns_removed | join(", ") }}</strong></li>
+        {% endif %}
+        {% if clean_report.unknown_columns_ignored %}
+        <li>Columns not in the schema (ignored): <strong>{{ clean_report.unknown_columns_ignored | join(", ") }}</strong></li>
+        {% endif %}
+        {% if clean_report.rates_converted_from_percent %}
+        <li>Rates converted from percent to 0–1: <strong>{{ clean_report.rates_converted_from_percent | join(", ") }}</strong></li>
+        {% endif %}
+        {% if clean_report.labels_unrecognized %}
+        <li>Unrecognized target_class values cleared: <strong>{{ clean_report.labels_unrecognized }}</strong></li>
+        {% endif %}
+        {% if clean_report.predicted_counts %}
+        <li>AI classification:
+            {% for label, n in clean_report.predicted_counts.items() %}
+                <strong>{{ label }}</strong> ({{ n }}){{ ", " if not loop.last }}
+            {% endfor %}
+        </li>
+        {% endif %}
+        {% if clean_report.columns_trimmed %}
+        <li>Whitespace trimmed in: <strong>{{ clean_report.columns_trimmed | join(", ") }}</strong></li>
+        {% endif %}
+        {% if clean_report.categorical_values_normalized %}
+        <li>Text casing normalized in: <strong>{{ clean_report.categorical_values_normalized | join(", ") }}</strong></li>
+        {% endif %}
+        {% if clean_report.numeric_values_coerced %}
+        <li>Invalid numeric entries cleared:
+            {% for col, count in clean_report.numeric_values_coerced.items() %}
+                <strong>{{ col }}</strong> ({{ count }}){{ ", " if not loop.last }}
+            {% endfor %}
+        </li>
+        {% endif %}
+        {% if clean_report.values_clipped %}
+        <li>Out-of-range values clipped:
+            {% for col, count in clean_report.values_clipped.items() %}
+                <strong>{{ col }}</strong> ({{ count }}){{ ", " if not loop.last }}
+            {% endfor %}
+        </li>
+        {% endif %}
+        {% if clean_report.values_imputed %}
+        <li>Missing values filled in:
+            {% for col, info in clean_report.values_imputed.items() %}
+                <strong>{{ col }}</strong> ({{ info.count }} filled with {{ info.method }}: {{ info.value }}){{ ", " if not loop.last }}
+            {% endfor %}
+        </li>
+        {% endif %}
+    </ul>
+</div>
+{% endif %}
+
+<div class="graph-box mt-30">
+    <div class="card-header-row">
+        <h3>Model Files</h3>
+        <form method="post" action="{{ url_for('reload_model') }}">
+            <button type="submit" class="btn">↻ Reload Model</button>
+        </form>
+    </div>
+    <p>
+        Live AI predictions use the deployable bundle exported by the training notebook
+        (<code>Dataset_Training.ipynb</code> → "Export .pkl files"):
+    </p>
+    <ul class="model-file-list">
+        <li><code>models/AURA_model_bundle.pkl</code> — fitted pipeline + metadata {% if model_files_present.bundle %}✅{% else %}❌{% endif %}</li>
+        <li><code>aura_transformers.py</code> — the notebook's custom pipeline classes (next to <code>app.py</code>) {% if model_files_present.transformers %}✅{% else %}❌{% endif %}</li>
+        <li><code>shap</code> library — exact SHAP explanations {% if model_files_present.shap %}✅{% else %}⚠️ not installed (an approximate tree-path explanation is used instead){% endif %}</li>
+    </ul>
+
+    {% if model_info %}
+    <div class="mt-30">
+        <h4 class="mb-20">Loaded Model</h4>
+        <ul class="model-file-list">
+            <li>Selected model: <strong>{{ model_info.selected_model }}</strong></li>
+            <li>Classes: <strong>{{ model_info.class_order | join(" · ") }}</strong></li>
+            <li>Features the model uses: <strong>{{ model_info.friendly_features | unique | join(", ") }}</strong></li>
+            <li>Explanations: <strong>{{ model_info.explainer }}</strong></li>
+            {% if model_info.version_mismatch %}
+            <li class="text-warning">⚠️ Trained with scikit-learn {{ model_info.trained_sklearn }}, but {{ model_info.installed_sklearn }} is installed. Run <code>pip install -r requirements.txt</code> to match the training version.</li>
+            {% endif %}
+        </ul>
+    </div>
+    {% elif model_error %}
+    <p class="text-warning mt-20">⚠️ The bundle exists but couldn't be loaded: <code>{{ model_error }}</code></p>
+    {% endif %}
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+    var input = document.getElementById('dataset');
+    var box = document.getElementById('file-chosen');
+    var nameEl = document.getElementById('file-chosen-name');
+    var sizeEl = document.getElementById('file-chosen-size');
+    var form = document.getElementById('upload-form');
+    var submit = document.getElementById('upload-submit');
+
+    function fmtSize(bytes) {
+        if (bytes < 1024) return bytes + ' B';
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+        return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    }
+
+    input.addEventListener('change', function () {
+        if (input.files && input.files.length) {
+            var f = input.files[0];
+            nameEl.textContent = f.name;
+            sizeEl.textContent = '· ' + fmtSize(f.size) + ' · ready to upload';
+            box.classList.add('has-file');
+        } else {
+            nameEl.textContent = 'No file chosen';
+            sizeEl.textContent = '';
+            box.classList.remove('has-file');
+        }
+    });
+
+    form.addEventListener('submit', function () {
+        if (input.files && input.files.length) {
+            submit.textContent = 'Uploading ' + input.files[0].name + '…';
+            submit.disabled = true;
+        }
+    });
+})();
+</script>
+{% endblock %}

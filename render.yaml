@@ -1,0 +1,26 @@
+# Render deployment config for AURA.
+# On render.com: New -> Blueprint -> point at your repo, and Render
+# reads this file automatically. Or skip this file entirely and just
+# fill in the same values by hand under New -> Web Service - either
+# way works, this just saves re-typing them.
+services:
+  - type: web
+    name: aura-app
+    runtime: python
+    buildCommand: "pip install -r requirements.txt"
+    # 1 worker keeps memory low (the model + pandas + SHAP must fit in 512 MB on the
+    # free plan); 2 threads still lets two people use it at once. 120 s timeout covers
+    # the first request after a cold start (model load).
+    startCommand: "gunicorn app:app --workers 1 --threads 2 --timeout 120 --bind 0.0.0.0:$PORT"
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: SECRET_KEY
+        generateValue: true
+      # If the service ever restarts with "out of memory", set this to 1 (explanations
+      # then use the lighter tree-path method instead of the SHAP library):
+      # - key: AURA_DISABLE_SHAP
+      #   value: "1"
+      # scikit-learn 1.6.1 (the model's training version) supports Python 3.9-3.13
+      - key: PYTHON_VERSION
+        value: 3.11.9

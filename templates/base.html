@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}AURA{% endblock %} · AURA</title>
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+    {% block head %}{% endblock %}
+</head>
+<body class="{% block body_class %}{% endblock %}">
+
+<div class="container">
+
+    {% block sidebar %}
+    <aside class="sidebar">
+        <div class="logo">AURA</div>
+        <div class="sidebar-tagline">Angeles University Foundation</div>
+        <ul>
+            <li><a href="{{ url_for('dashboard') }}" class="{{ 'active' if active_page == 'dashboard' }}">🏠 Dashboard</a></li>
+            <li><a href="{{ url_for('students') }}" class="{{ 'active' if active_page == 'students' }}">👨‍🎓 Students</a></li>
+            <li><a href="{{ url_for('upload') }}" class="{{ 'active' if active_page == 'upload' }}">📂 Upload Dataset</a></li>
+            <li><a href="{{ url_for('analytics') }}" class="{{ 'active' if active_page == 'analytics' }}">📈 Analytics</a></li>
+            <li><a href="{{ url_for('recommendations') }}" class="{{ 'active' if active_page == 'recommendations' }}">🎯 Recommendations</a></li>
+        </ul>
+        {% if current_user.is_authenticated %}
+        <div class="sidebar-user">
+            <div class="sidebar-user-name">👤 {{ current_user.full_name }}</div>
+            <a href="{{ url_for('logout') }}" class="sidebar-logout">Log Out</a>
+        </div>
+        {% endif %}
+    </aside>
+    {% endblock %}
+
+    <main class="main-content">
+
+        {% if current_user.is_authenticated %}
+        <div class="topbar">
+            <div class="topbar-eyebrow">Academic Undertaking &amp; Risk Analytics · <strong>AUF</strong></div>
+            <div class="topbar-right">
+                {% if current_user.is_authenticated %}
+                <div class="topbar-user">
+                    <div class="topbar-user-name">{{ current_user.full_name }}</div>
+                    <div class="topbar-user-role">{{ current_user.role|default('Teacher', true)|capitalize }}</div>
+                </div>
+                {% endif %}
+                <img src="{{ url_for('static', filename='img/auf_logo.png') }}" alt="Angeles University Foundation seal" class="topbar-crest">
+            </div>
+        </div>
+        {% endif %}
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flash-stack mb-30">
+                    {% for category, message in messages %}
+                        <div class="flash flash-{{ category }}">{{ message }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        {% if show_status_banner %}
+        <div class="status-banner">
+            {% if not has_dataset %}
+                <span>📂 No dataset loaded yet — visit <a href="{{ url_for('upload') }}">Upload Dataset</a> to get started. Showing demo data for now.</span>
+            {% elif not model_ready %}
+                <span>🤖 Dataset loaded, but the trained model isn't available yet. AI predictions are off until <code>models/AURA_model_bundle.pkl</code> and <code>aura_transformers.py</code> are in place — see <a href="{{ url_for('upload') }}">Upload Dataset → Model Files</a>.</span>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        {% block content %}{% endblock %}
+
+    </main>
+
+</div>
+
+{% block scripts %}{% endblock %}
+</body>
+</html>

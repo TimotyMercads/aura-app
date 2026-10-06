@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Database Unavailable · AURA</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="login-body">
+<div class="error-page-wrap">
+    <div class="login-card torch-glow" style="width:480px; text-align:center;">
+        <div class="login-crest">
+            <img src="{{ url_for('static', filename='img/auf_logo.png') }}" alt="Angeles University Foundation seal">
+        </div>
+        <h2 class="mb-20">⚠️ Can't reach the database</h2>
+        <p class="mb-20" style="color:var(--text-body); font-size:14px;">
+            AURA couldn't connect to MySQL. This almost always means XAMPP's MySQL
+            service isn't running yet.
+        </p>
+        <p class="text-muted mb-20">
+            Open the XAMPP Control Panel and click <strong>Start</strong> next to
+            <strong>MySQL</strong>, then refresh this page. See
+            <code>XAMPP_SETUP.md</code> in the project folder for full setup steps.
+        </p>
+        <a href="{{ url_for('login') }}" class="btn">Try Again</a>
+    </div>
+</div>
+</body>
+</html>

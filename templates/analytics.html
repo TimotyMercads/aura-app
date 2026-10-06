@@ -1,0 +1,210 @@
+{% extends "base.html" %}
+{% block title %}Analytics{% endblock %}
+
+{% block content %}
+
+<h1 class="page-title">Analytics Dashboard</h1>
+
+<div class="cards">
+    <div class="card">
+        <h4>📊 Average GWA</h4>
+        <h2>{{ "%.2f"|format(charts.avg_grade) if charts and charts.avg_grade is not none else "—" }}</h2>
+    </div>
+    <div class="card green">
+        <h4>🗓️ Attendance Rate</h4>
+        <h2>{{ charts.avg_attendance if charts and charts.avg_attendance is not none else "—" }}{{ "%" if charts and charts.avg_attendance is not none }}</h2>
+    </div>
+    <div class="card red">
+        <h4>⚠️ Students At-Risk</h4>
+        <h2>{{ charts.at_risk_count if charts else "—" }}</h2>
+    </div>
+</div>
+
+<div class="analytics-grid">
+    <div class="graph-box">
+        <h3>Student Performance Distribution</h3>
+        {% if charts and charts.performance_counts %}
+            <div class="chart-wrap">
+                <canvas id="perfDist"></canvas>
+            </div>
+        {% else %}
+            <div class="chart-placeholder">Upload a dataset to see this chart</div>
+        {% endif %}
+    </div>
+
+    <div class="summary-card">
+        <h3>AI Summary</h3>
+        {% if charts and charts.ai_summary %}
+            {% for line in charts.ai_summary %}
+            <p class="mb-10">• {{ line }}</p>
+            {% endfor %}
+        {% else %}
+            <p>Upload a dataset to generate an automated summary.</p>
+        {% endif %}
+    </div>
+</div>
+
+<div class="charts-grid-2 mb-20">
+    <div class="graph-box">
+        <h3>Attendance by Year Level</h3>
+        {% if charts and charts.attendance_by_year %}
+            <div class="chart-wrap chart-wrap-sm">
+                <canvas id="attendanceByYear"></canvas>
+            </div>
+            <p class="text-muted mt-20" style="font-size:12px;">Attendance values in the AY 2025-2026 dataset are simulated (see its Data_Dictionary) and are not used by the model.</p>
+        {% else %}
+            <div class="chart-placeholder">Upload a dataset to see this chart</div>
+        {% endif %}
+    </div>
+
+    <div class="graph-box">
+        <h3>Classification by Program</h3>
+        {% if charts and charts.class_by_program and charts.class_by_program._programs %}
+            <div class="chart-wrap chart-wrap-sm">
+                <canvas id="classByProgram"></canvas>
+            </div>
+        {% else %}
+            <div class="chart-placeholder">Upload a dataset to see this chart</div>
+        {% endif %}
+    </div>
+</div>
+
+{% if top_features %}
+<div class="graph-box mb-20">
+    <h3>Top Predictors (from trained model)</h3>
+    <p class="text-muted mb-10">Mean absolute SHAP value across your students (all classes) — how strongly each factor moves the prediction on average.</p>
+    <div class="chart-wrap chart-wrap-sm">
+        <canvas id="topFeatures"></canvas>
+    </div>
+</div>
+{% endif %}
+
+{% if model_info %}
+<div class="graph-box">
+    <h3>Model Card</h3>
+    <p class="text-muted">
+        Selected model: <strong>{{ model_info.selected_model }}</strong> · classes:
+        {{ model_info.class_order | join(" / ") }} · explanations: {{ model_info.explainer }}.
+        Scores below are from the held-out 30% <strong>test set</strong> in the training notebook
+        (evaluated once, before the deployed model was refit on all data).
+    </p>
+    {% set m = model_info.test_metrics %}
+    <div class="model-metrics">
+        {% for key in ["Accuracy", "F1 (macro)", "MCC", "ROC-AUC (OvR macro)", "Recall (macro)", "Specificity (macro)", "At-Risk Recall", "At-Risk Precision"] %}
+            {% if m.get(key) is not none %}
+            <div class="model-metric"><span>{{ key }}</span><strong>{{ "%.3f"|format(m[key]) }}</strong></div>
+            {% endif %}
+        {% endfor %}
+    </div>
+    <p class="text-muted mt-20" style="font-size:12px;">
+        The test set contained only 4 At-Risk students, so At-Risk recall/precision there are very
+        uncertain. Treat At-Risk flags as prompts for a closer look, not conclusions.
+    </p>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+{% if charts or top_features %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+Chart.defaults.color = '#93A1BC';
+Chart.defaults.font.family = "'Poppins', sans-serif";
+</script>
+{% endif %}
+{% if charts %}
+<script>
+{% if charts.performance_counts %}
+new Chart(document.getElementById('perfDist'), {
+    type: 'doughnut',
+    data: {
+        labels: {{ charts.performance_counts.keys() | list | tojson }},
+        datasets: [{
+            data: {{ charts.performance_counts.values() | list | tojson }},
+            backgroundColor: {{ charts.performance_colors | tojson }},
+            borderColor: '#1B3358',
+            borderWidth: 2
+        }]
+    },
+    options: {
+        maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 14 } } }
+    }
+});
+{% endif %}
+
+{% if charts.attendance_by_year %}
+new Chart(document.getElementById('attendanceByYear'), {
+    type: 'bar',
+    data: {
+        labels: {{ charts.attendance_by_year.keys() | list | tojson }},
+        datasets: [{
+            label: 'Attendance Rate (%)',
+            data: {{ charts.attendance_by_year.values() | list | tojson }},
+            backgroundColor: '#3E6FA8',
+            borderRadius: 6,
+            maxBarThickness: 46
+        }]
+    },
+    options: {
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+            y: { grid: { color: 'rgba(255,255,255,.06)' } },
+            x: { grid: { display: false } }
+        }
+    }
+});
+{% endif %}
+
+{% if charts.class_by_program and charts.class_by_program._programs %}
+new Chart(document.getElementById('classByProgram'), {
+    type: 'bar',
+    data: {
+        labels: {{ charts.class_by_program._programs | tojson }},
+        datasets: [
+            { label: 'At-Risk', data: {{ charts.class_by_program['At-Risk'] | tojson }}, backgroundColor: '#9C3A56', borderRadius: 4 },
+            { label: 'Stable', data: {{ charts.class_by_program['Stable'] | tojson }}, backgroundColor: '#3E6FA8', borderRadius: 4 },
+            { label: 'High-Performing', data: {{ charts.class_by_program['High-Performing'] | tojson }}, backgroundColor: '#57B27F', borderRadius: 4 }
+        ]
+    },
+    options: {
+        maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 14 } } },
+        scales: {
+            x: { stacked: true, grid: { display: false } },
+            y: { stacked: true, grid: { color: 'rgba(255,255,255,.06)' } }
+        }
+    }
+});
+{% endif %}
+</script>
+{% endif %}
+
+{% if top_features %}
+<script>
+new Chart(document.getElementById('topFeatures'), {
+    type: 'bar',
+    data: {
+        labels: {{ top_features | map(attribute=0) | list | tojson }},
+        datasets: [{
+            label: 'mean |SHAP|',
+            data: {{ top_features | map(attribute=1) | list | tojson }},
+            backgroundColor: '#D4A73D',
+            borderRadius: 6
+        }]
+    },
+    options: {
+        maintainAspectRatio: false,
+        indexAxis: 'y',
+        plugins: { legend: { display: false } },
+        scales: {
+            x: { grid: { color: 'rgba(255,255,255,.06)' } },
+            y: { grid: { display: false } }
+        }
+    }
+});
+</script>
+{% endif %}
+{% endblock %}

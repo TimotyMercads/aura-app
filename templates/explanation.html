@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}Why This Prediction?{% endblock %}
+
+{% block content %}
+
+<a href="{{ url_for('student_insight', student_id=student.id) }}" class="back-link">← Back to Student</a>
+
+<h1 class="page-title mb-10">Why This Prediction?</h1>
+<p class="text-muted mb-30">
+    Written in plain language — this page is meant to be easy to read and share with
+    parents, not just other teachers. No technical terms or raw statistics, just what's
+    actually going on with {{ student.id }}.
+</p>
+
+{% if explanation and explanation.top_features %}
+    <div class="prediction-banner">
+        The AI classified {{ student.id }} as
+        {% if explanation.predicted_label == "At-Risk" %}<span class="label-at-risk">AT-RISK</span>
+        {% elif explanation.predicted_label == "Stable" %}<span class="label-stable">STABLE</span>
+        {% else %}<span class="label-high">HIGH-PERFORMING</span>{% endif %}
+        {% if prediction and prediction.confidence %}<span class="text-muted"> ({{ prediction.confidence }}% confidence)</span>{% endif %}.
+        These are the factors it weighed most:
+    </div>
+
+    <div class="plain-explain-list">
+    {% for f in explanation.top_features %}
+    <div class="plain-explain-card {{ 'risk' if f.plain.direction == 'risk' else 'support' }}">
+        <div class="plain-explain-header">
+            <div>
+                <span class="plain-explain-icon">{{ "⚠️" if f.plain.direction == "risk" else "✅" }}</span>
+                <span class="plain-explain-name">{{ f.plain.plain_name }}</span>
+                <span class="plain-explain-value">{{ f.plain.formatted_value }}</span>
+            </div>
+            <span class="plain-explain-level-tag {{ f.plain.direction }}">{{ f.plain.level }} factor</span>
+        </div>
+
+        <div class="plain-explain-bar-track">
+            <div class="plain-explain-bar-fill {{ f.plain.direction }}" style="width:{{ f.plain.level_pct }}%;"></div>
+        </div>
+
+        <p class="plain-explain-note">{{ f.plain.note }}</p>
+    </div>
+    {% endfor %}
+    </div>
+
+    <div class="graph-box mt-20">
+        <p class="text-muted" style="font-size:12.5px;">
+            <strong>How to read this:</strong> each card above is one factor the AI weighed when
+            making its prediction for this student. "Major / Moderate / Minor" shows roughly how
+            much that factor mattered compared to the others — it is not a grade or a score by
+            itself. ⚠️ factors are pulling toward a weaker outcome (At-Risk); ✅ factors are
+            pulling toward a stronger outcome (High-Performing).
+        </p>
+        <div class="hitl-note">
+            Explanations show what the model relied on, not proven causes. Factors such as program
+            and year level describe group patterns in the data, never a judgment of the student.
+            All outputs are non-binding and should be reviewed with professional judgment.
+        </div>
+    </div>
+
+    <details class="graph-box mt-20">
+        <summary style="cursor:pointer; font-weight:600;">Technical detail for advisers (SHAP values)</summary>
+        <p class="text-muted mt-20 mb-10">
+            Method: {{ explanation.method }}. Values are each factor's contribution to the predicted
+            probability of <strong>{{ explanation.predicted_label }}</strong>, starting from a baseline of
+            {{ explanation.base_value }}. One-hot columns (program, K-Means group) are summed into one factor.
+        </p>
+        <table class="tech-table">
+            <thead>
+                <tr><th>Factor</th><th>Value</th><th>SHAP</th><th>Effect</th></tr>
+            </thead>
+            <tbody>
+            {% for t in explanation.technical %}
+                <tr>
+                    <td>{{ t.label }}</td>
+                    <td>{{ t.value }}</td>
+                    <td>{{ "%+.4f"|format(t.shap) }}</td>
+                    <td>{{ t.effect }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </details>
+{% else %}
+    <div class="insight-card">
+        <h3 class="mb-20">No live explanation available yet</h3>
+        <p>
+            A per-student explanation needs the trained model
+            (<code>models/AURA_model_bundle.pkl</code> and <code>aura_transformers.py</code>).
+            Once it's loaded, this page will explain — in plain language, safe to share with
+            parents — the top factors behind this student's prediction.
+        </p>
+    </div>
+{% endif %}
+
+{% endblock %}

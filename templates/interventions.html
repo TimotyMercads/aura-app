@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% block title %}Intervention Recommendations{% endblock %}
+
+{% block content %}
+
+<a href="{{ url_for('student_insight', student_id=student.id) }}" class="back-link">← Back to Student</a>
+
+
+<h1 class="page-title mb-10">Intervention Recommendations</h1>
+<p class="text-muted mb-30">
+    Based on AUF's approved <strong>Early Intervention and Academic Support for Students at Risk</strong>
+    policy (Office of the VP for Academic Affairs, implemented January 25, 2024).
+</p>
+
+{% if current_stage %}
+
+<p class="mb-20">
+    Student {{ student.id }} is currently classified <strong>At-Risk</strong>, and based on
+    the semester GWAs appears closest to
+    <span class="stage-badge">Stage {{ current_stage }}</span>
+    of the policy. This is an estimate from the data on hand — use your own judgment on which
+    stage actually applies.
+</p>
+
+{% if factor_actions %}
+<div class="graph-box mb-20">
+    <h3 class="mb-10">Suggested from this student's explanation</h3>
+    <p class="policy-note mb-20">Prescriptive, non-binding suggestions based on the factors behind the prediction — not part of the AUF policy.</p>
+    <ul class="model-file-list">
+        {% for a in factor_actions %}<li>💡 {{ a }}</li>{% endfor %}
+    </ul>
+    <h4 class="mt-20 mb-10">General remediation strategies</h4>
+    <ul class="model-file-list">
+        {% for a in at_risk_suggestions %}<li>✅ {{ a }}</li>{% endfor %}
+    </ul>
+</div>
+{% endif %}
+
+{% for stage in stages %}
+<div class="stage-card {{ 'current-stage' if stage.number == current_stage }}">
+    <div class="stage-card-header">
+        <h3>{{ stage.title }}</h3>
+        {% if stage.number == current_stage %}<span class="stage-badge">Current</span>{% endif %}
+    </div>
+    <p class="stage-trigger"><strong>Trigger:</strong> {{ stage.trigger }}</p>
+
+    <div class="stage-steps">
+        {% for step in stage.steps %}
+        <div class="stage-step">
+            <div class="stage-step-title">{{ step.title }}</div>
+            <div class="stage-step-detail">{{ step.detail }}</div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <ul class="checklist">
+        {% for action_key, action_label in stage.actions %}
+        {% set done = completed_actions.get(action_key, {}) %}
+        <li class="checklist-item">
+            <form method="post" action="{{ url_for('toggle_intervention_action', student_id=student.id) }}">
+                <input type="hidden" name="stage" value="{{ stage.number }}">
+                <input type="hidden" name="action_key" value="{{ action_key }}">
+                <button type="submit" class="checklist-checkbox-btn {{ 'checked' if done.get('completed') }}">
+                    {{ "✓" if done.get('completed') }}
+                </button>
+            </form>
+            <span class="checklist-text">
+                {{ action_label }}
+                {% if done.get('completed') %}
+                <span class="checklist-meta">
+                    Completed {{ done.completed_at.strftime('%b %d, %Y') if done.completed_at }}{% if done.completed_by_name %} by {{ done.completed_by_name }}{% endif %}
+                </span>
+                {% endif %}
+            </span>
+        </li>
+        {% endfor %}
+    </ul>
+</div>
+{% endfor %}
+
+{% else %}
+
+<p class="mb-20">
+    Student {{ student.id }} is currently classified
+    <strong>{{ display_label or "Unclassified" }}</strong>, so the AUF at-risk policy stages don't apply.
+</p>
+
+<div class="intervention-columns">
+    <div class="intervention-column active-column">
+        <h4>{% if display_label == "High-Performing" %}Enrichment Suggestions{% else %}Monitoring Suggestions{% endif %}</h4>
+        <p class="policy-note mb-20">
+            Not part of the formal policy — AUF's Early Intervention Policy specifically
+            covers at-risk students. These are the study's own non-binding suggestions
+            (manuscript Sections 2.7.3–2.7.4).
+        </p>
+        {% if factor_actions %}
+        <ul class="mb-20">
+            {% for a in factor_actions %}<li>💡 {{ a }}</li>{% endfor %}
+        </ul>
+        {% endif %}
+        <ul>
+            {% for suggestion in (label_suggestions or high_performing_suggestions) %}
+            <li>✅ {{ suggestion }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+</div>
+
+{% endif %}
+
+<div class="graph-box mt-30">
+    <h3 class="mb-20">Policy Reminders</h3>
+    <ul class="model-file-list">
+        {% for reminder in policy_reminders %}
+        <li>{{ reminder }}</li>
+        {% endfor %}
+    </ul>
+</div>
+
+{% endblock %}

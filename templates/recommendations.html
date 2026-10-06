@@ -1,0 +1,211 @@
+{% extends "base.html" %}
+{% block title %}Recommendations{% endblock %}
+
+{% block content %}
+
+<h1 class="page-title">AI Intervention Recommendations</h1>
+<p class="text-muted mb-20">
+    Based on AUF's approved <strong>Early Intervention and Academic Support for Students at Risk</strong>
+    policy (Office of the VP for Academic Affairs, implemented January 25, 2024).
+</p>
+
+<div class="cards">
+    <div class="card red">
+        <h4>At-Risk (Intervene)</h4>
+        <h2>{{ buckets.counts[0] if buckets else "—" }}</h2>
+    </div>
+    <div class="card blue">
+        <h4>Stable (Monitor)</h4>
+        <h2>{{ buckets.counts[1] if buckets else "—" }}</h2>
+    </div>
+    <div class="card green">
+        <h4>High-Performing (Enrich)</h4>
+        <h2>{{ buckets.counts[2] if buckets else "—" }}</h2>
+    </div>
+</div>
+
+<div class="recommendations">
+    {% for stage in stages %}
+    <div class="recommendation-box">
+        <h3>{{ stage.title.split("—")[0].strip() }}</h3>
+        <p class="policy-note mb-20">{{ stage.trigger }}</p>
+        <ul>
+            {% for step in stage.steps %}
+            <li>{{ step.title }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endfor %}
+
+    <div class="recommendation-box">
+        <h3>AI Prediction Summary</h3>
+        {% if buckets %}
+        <p>
+            Of the currently loaded dataset, <strong>{{ buckets.counts[0] }}</strong> student(s)
+            are classified <strong>At-Risk</strong> and fall under the AUF policy,
+            <strong>{{ buckets.counts[1] }}</strong> are <strong>Stable</strong>
+            ({{ buckets.early_warning_count }} of them with an At-Risk probability of
+            {{ buckets.early_warning_threshold|int }}% or more), and
+            <strong>{{ buckets.counts[2] }}</strong> are <strong>High-Performing</strong>.
+        </p>
+        <br>
+        <p>Recommended follow-up every <strong>30 days</strong>. All recommendations are non-binding — the final decision stays with the educator.</p>
+        {% else %}
+        <p>Upload a dataset to generate a real prediction summary.</p>
+        {% endif %}
+    </div>
+
+    <div class="recommendation-box">
+        <h3>Monitoring Pathway (Stable)</h3>
+        <p class="policy-note mb-20">The study's own non-binding suggestions — not part of the AUF policy.</p>
+        <ul>
+            {% for sgt in stable_suggestions %}
+            <li>{{ sgt }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+
+    <div class="recommendation-box">
+        <h3>Enrichment Pathway (High-Performing)</h3>
+        <p class="policy-note mb-20">From the manuscript's enrichment strategies — not part of the AUF at-risk policy.</p>
+        <ul>
+            {% for sgt in high_performing_suggestions %}
+            <li>{{ sgt }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+</div>
+
+{% if buckets and buckets.high_risk %}
+<div class="table-container mt-30">
+    <h3 class="mb-20">Students Needing Immediate Attention (At-Risk)</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Student ID</th>
+                <th>Program</th>
+                <th>GWA</th>
+                <th>At-Risk Probability</th>
+                <th>Status</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for s in buckets.high_risk %}
+            <tr>
+                <td>{{ s.id }}</td>
+                <td>{{ s.program }}</td>
+                <td>{{ "%.2f"|format(s.gwa) if s.gwa is not none else "—" }}</td>
+                <td>{{ s.prob_at_risk if s.prob_at_risk is not none else "—" }}{{ "%" if s.prob_at_risk is not none }}</td>
+                <td><span class="badge {{ s.status_class }}">{{ s.status_text }}</span></td>
+                <td><a href="{{ url_for('student_recommendations', student_id=s.id) }}" class="btn">Plan</a></td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+{% if buckets and buckets.monitor %}
+<div class="table-container mt-30">
+    <h3 class="mb-20">Early Warning — Stable Students with Elevated At-Risk Probability</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Student ID</th>
+                <th>Program</th>
+                <th>GWA</th>
+                <th>At-Risk Probability</th>
+                <th>Status</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for s in buckets.monitor %}
+            <tr>
+                <td>{{ s.id }}</td>
+                <td>{{ s.program }}</td>
+                <td>{{ "%.2f"|format(s.gwa) if s.gwa is not none else "—" }}</td>
+                <td>{{ s.prob_at_risk }}%</td>
+                <td><span class="badge {{ s.status_class }}">{{ s.status_text }}</span></td>
+                <td><a href="{{ url_for('student_insight', student_id=s.id) }}" class="btn">View</a></td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+<div class="graph-box mt-30">
+    <div class="card-header-row">
+        <h3>Teacher Action Plan</h3>
+    </div>
+    <p class="text-muted mb-20">
+        Your own reminders and scheduled follow-ups — add one below, and update its status
+        as you work through it.
+    </p>
+
+    <form method="post" action="{{ url_for('action_plan_create') }}" class="action-plan-form mb-30">
+        <input type="text" name="title" placeholder="Action / reminder title" required>
+        <input type="text" name="student_id" placeholder="Student ID (optional)">
+        <select name="priority">
+            {% for p in priorities %}
+            <option value="{{ p }}" {{ "selected" if p == "Medium" }}>{{ p }} priority</option>
+            {% endfor %}
+        </select>
+        <input type="date" name="due_date">
+        <select name="status">
+            {% for s in statuses %}
+            <option value="{{ s }}" {{ "selected" if s == "Pending" }}>{{ s }}</option>
+            {% endfor %}
+        </select>
+        <button type="submit" class="btn">+ Add</button>
+    </form>
+
+    {% if action_items %}
+    <table>
+        <thead>
+            <tr>
+                <th>Priority</th>
+                <th>Action</th>
+                <th>Student</th>
+                <th>Due</th>
+                <th>Status</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for item in action_items %}
+            <tr>
+                <td>{{ item.priority }}</td>
+                <td>
+                    {{ item.title }}
+                    {% if item.is_overdue %}<span class="badge badge-danger ml-8">Overdue</span>{% elif item.is_due_soon %}<span class="badge badge-warning ml-8">Due Soon</span>{% endif %}
+                    {% if item.notes %}<div class="text-muted" style="font-size:12px; margin-top:3px;">{{ item.notes }}</div>{% endif %}
+                </td>
+                <td>{{ item.student_id or "—" }}</td>
+                <td>{{ item.due_date.strftime('%b %d, %Y') if item.due_date else "—" }}</td>
+                <td>
+                    <form method="post" action="{{ url_for('action_plan_update_status', item_id=item.id) }}" class="status-form">
+                        <select name="status" onchange="this.form.submit()" class="status-select {{ item.badge_class }}">
+                            {% for s in statuses %}
+                            <option value="{{ s }}" {{ "selected" if s == item.status }}>{{ s }}</option>
+                            {% endfor %}
+                        </select>
+                    </form>
+                </td>
+                <td>
+                    <form method="post" action="{{ url_for('action_plan_delete', item_id=item.id) }}" onsubmit="return confirm('Remove this action item?');">
+                        <button type="submit" class="btn-icon-delete" aria-label="Delete">🗑️</button>
+                    </form>
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="text-muted">No action items yet — add one above to start tracking your reminders and follow-ups.</p>
+    {% endif %}
+</div>
+
+{% endblock %}
