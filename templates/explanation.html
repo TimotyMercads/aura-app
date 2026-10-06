@@ -19,9 +19,17 @@
         {% elif explanation.predicted_label == "Stable" %}<span class="label-stable">STABLE</span>
         {% else %}<span class="label-high">HIGH-PERFORMING</span>{% endif %}
         {% if prediction and prediction.confidence %}<span class="text-muted"> ({{ prediction.confidence }}% confidence)</span>{% endif %}.
-        These are the factors it weighed most:
     </div>
 
+    {% if narrative %}
+    <div class="narrative-card">
+        <h3>In short</h3>
+        <p>{{ narrative }}</p>
+    </div>
+    {% endif %}
+
+    <details class="factor-details mt-20">
+        <summary>See each factor one by one</summary>
     <div class="plain-explain-list">
     {% for f in explanation.top_features %}
     <div class="plain-explain-card {{ 'risk' if f.plain.direction == 'risk' else 'support' }}">
@@ -42,10 +50,11 @@
     </div>
     {% endfor %}
     </div>
+    </details>
 
     <div class="graph-box mt-20">
         <p class="text-muted" style="font-size:12.5px;">
-            <strong>How to read this:</strong> each card above is one factor the AI weighed when
+            <strong>How to read this:</strong> each card under &ldquo;See each factor one by one&rdquo; is one factor the AI weighed when
             making its prediction for this student. "Major / Moderate / Minor" shows roughly how
             much that factor mattered compared to the others — it is not a grade or a score by
             itself. ⚠️ factors are pulling toward a weaker outcome (At-Risk); ✅ factors are
