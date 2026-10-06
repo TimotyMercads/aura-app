@@ -35,7 +35,7 @@ from flask_login import (
 from sqlalchemy.exc import OperationalError
 
 from services import data_service, model_service, auth_service, intervention_service, action_plan_service
-from utils import intervention_policy
+from utils import intervention_policy, plain_language
 from utils.cleaning import total_changes, CRITICAL_COLUMNS, SCHEMA_COLUMNS
 
 app = Flask(__name__)
@@ -321,11 +321,22 @@ def student_explanation(student_id):
     prediction = model_service.predict_student(row) if model_service.is_ready() else None
     explanation = model_service.explain_student(row) if model_service.is_ready() else None
 
+    narrative = None
+    if explanation and explanation.get("top_features"):
+        narrative = plain_language.narrative_paragraph(
+            student["id"], explanation["predicted_label"],
+            prediction.get("confidence") if prediction else None,
+            prediction.get("probabilities") if prediction else None,
+            explanation["top_features"],
+            include_intro=False,        # the page banner above already states the class
+        )
+
     return render_template(
         "explanation.html",
         student=student,
         prediction=prediction,
         explanation=explanation,
+        narrative=narrative,
         **_common_context("students"),
     )
 
