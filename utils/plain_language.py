@@ -294,3 +294,96 @@ def describe_feature(feature_key, raw_value, direction, shap_value, max_abs_shap
         "level_pct": level_pct,
         "direction": "risk" if is_risk else "support",
     }
+
+
+# --------------------------------------------------------------------------
+# One readable paragraph per student (shown first on the Explanation page)
+# --------------------------------------------------------------------------
+
+# How each factor reads inside a sentence ({v} = its formatted value).
+_PARAGRAPH_PHRASES = {
+    "first_sem_gwa": "the 1st-semester GWA of {v}",
+    "gwa": "the annual GWA of {v}",
+    "second_sem_gwa": "the 2nd-semester GWA of {v}",
+    "total_classes": "a course load of {v}",
+    "year_level": "being in {v}",
+    "program": "being in the {v} program",
+    "student_group": "being placed in {v} by the clustering step",
+    "attendance_rate": "an attendance rate of {v}",
+    "absences": "{v} of absences",
+    "lms_login_count": "{v} on the LMS",
+}
+
+
+def _phrase(f):
+    value = f["plain"]["formatted_value"]
+    template = _PARAGRAPH_PHRASES.get(f["feature"])
+    if template:
+        return template.format(v=value)
+    return f"{f['plain']['plain_name']} ({value})"
+
+
+def _join(items):
+    if len(items) <= 1:
+        return "".join(items)
+    return ", ".join(items[:-1]) + " and " + items[-1]
+
+
+def _cap(text):
+    return text[:1].upper() + text[1:]
+
+
+_CLOSING = {
+    "At-Risk": "A short check-in with the student, and the suggested actions on the student's page, would be a sensible next step.",
+    "Stable": "The student is not flagged, but it is worth re-checking when the next term's grades are released.",
+    "High-Performing": "The student may be a good candidate for the enrichment opportunities listed in the recommendations.",
+}
+
+
+def narrative_paragraph(student_id, label, confidence, probabilities, top_features, include_intro=True):
+    """
+    Turns the ranked factor list into ONE plain paragraph a teacher can read
+    aloud: the class and confidence, the biggest influence and what it means,
+    the other factors (pulling toward a weaker or stronger result), and a
+    short next step with the non-binding reminder. No SHAP numbers.
+    Returns None if there are no factors.
+    """
+    if not top_features:
+        return None
+
+    first = ""
+    if include_intro:
+        first = f"AURA classified {student_id} as {label}"
+        if confidence:
+            first += f" with {confidence:g}% confidence"
+        first += "."
+    if probabilities:
+        others = sorted(((c, p) for c, p in probabilities.items() if c != label),
+                        key=lambda kv: kv[1], reverse=True)
+        if others and others[0][1] >= 20:
+            first = (first + " " if first else "") + (
+                f"The model also gave {others[0][0]} a {others[0][1]:g}% chance, so this is not a clear-cut case.")
+
+    main = top_features[0]
+    second = f"The biggest influence was {_phrase(main)}. {main['plain']['note']}"
+
+    rest = top_features[1:]
+    risk = [f for f in rest if f["plain"]["direction"] == "risk"]
+    support = [f for f in rest if f["plain"]["direction"] == "support"]
+    clauses = []
+    if risk:
+        slight = "slightly " if all(f["plain"]["level"] == "Minor" for f in risk) else ""
+        clauses.append(f"{_cap(_join([_phrase(f) for f in risk]))} also {slight}pulled toward a weaker result")
+    if support:
+        slight = "slightly " if all(f["plain"]["level"] == "Minor" for f in support) else ""
+        text = f"{_join([_phrase(f) for f in support])} {slight}worked in the student's favor"
+        clauses.append(text if not clauses else text)
+    third = ""
+    if clauses:
+        third = (", while ".join(clauses) if len(clauses) == 2 else clauses[0]) + "."
+        if len(clauses) == 2 and not risk:
+            third = _cap(third)
+
+    closing = _CLOSING.get(label, "")
+    caveat = "These are patterns the model relied on, not proven causes, so please weigh them with your own knowledge of the student."
+    return " ".join(x for x in (first, second, third, closing, caveat) if x)
