@@ -730,6 +730,38 @@ table{
     min-height:0;
 }
 
+/* One-paragraph explanation (top of the Explanation page) */
+.narrative-card{
+    background:var(--panel);
+    border-left:4px solid var(--gold);
+    border-radius:var(--radius);
+    padding:22px 26px;
+    margin-bottom:6px;
+}
+
+.narrative-card h3{
+    font-size:13px;
+    letter-spacing:.06em;
+    text-transform:uppercase;
+    color:var(--gold-soft);
+    margin-bottom:10px;
+}
+
+.narrative-card p{
+    font-size:15.5px;
+    line-height:1.85;
+    color:var(--text-body);
+}
+
+.factor-details > summary{
+    cursor:pointer;
+    font-weight:600;
+    padding:12px 4px;
+    color:var(--text-body);
+}
+
+.factor-details[open] > summary{ margin-bottom:10px; }
+
 /* Compact rows inside scrolling lists so more students fit on screen */
 .table-scroll tbody td{ padding:8px 15px; }
 .table-scroll thead th{ padding:11px 15px; }
