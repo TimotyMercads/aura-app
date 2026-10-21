@@ -129,7 +129,7 @@ entirely, since it isn't a serverless platform.
 Render/Vercel deploys them along with the code (delete the old
 `models/AURA_model_bundle.pkl`). `requirements.txt` pins
 `scikit-learn==1.6.1`, the version the model was trained with, and installs
-`xgboost-cpu`; `render.yaml` sets Python 3.11. If Render runs out of memory,
+`xgboost-cpu`; `render.yaml` sets Python 3.12 (XGBoost 3.4.1 needs 3.12+). If Render runs out of memory,
 add the environment variable `AURA_DISABLE_SHAP=1` - explanations then use
 XGBoost's built-in TreeSHAP, which gives the same values.
 

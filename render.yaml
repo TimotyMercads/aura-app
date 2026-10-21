@@ -21,6 +21,7 @@ services:
       # then use XGBoost's built-in TreeSHAP (same exact values, no shap library loaded):
       # - key: AURA_DISABLE_SHAP
       #   value: "1"
-      # scikit-learn 1.6.1 (the model's training version) supports Python 3.9-3.13
+      # Python 3.12+: the model was saved with XGBoost 3.4.1, which requires Python >= 3.12
+      # (scikit-learn 1.6.1 supports Python 3.9-3.13)
       - key: PYTHON_VERSION
-        value: 3.11.9
+        value: 3.12.10
