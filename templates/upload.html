@@ -7,7 +7,7 @@
 
 <div class="upload-box" id="upload-box">
     <h2>Upload CSV or XLSX Dataset</h2>
-    <p>Select a student file matching the AURA AY 2025-2026 dataset schema (for an .xlsx workbook, the <code>dataset</code> sheet is read).</p>
+    <p>Select a student file with the columns below — only the inputs the model actually uses (for an .xlsx workbook, the <code>dataset</code> sheet is read, or the first sheet).</p>
 
     <form method="post" enctype="multipart/form-data" action="{{ url_for('upload') }}" id="upload-form">
         <label class="upload-btn" for="dataset">Choose File</label>
@@ -34,9 +34,49 @@
     </div>
     {% endif %}
 
-    <p class="text-muted mt-20">
-        Required columns: {% for c in required_columns %}<code>{{ c }}</code>{{ ", " if not loop.last }}{% endfor %}.
-        <code>target_class</code> is optional — unlabeled students are classified by the model.
+</div>
+
+<div class="graph-box mt-30">
+    <div class="card-header-row">
+        <h3>Columns Your File Needs</h3>
+        <a href="{{ url_for('download_template') }}" class="btn">⬇ Download Template (CSV)</a>
+    </div>
+    <p class="text-muted mb-20">
+        AURA only asks for what the prediction actually uses. The final model (XGBoost) predicts from
+        three inputs; <code>student_id</code> just identifies each row.
+    </p>
+    <div class="table-scroll-x">
+    <table class="columns-table">
+        <thead>
+            <tr><th>Column</th><th>Needed?</th><th>What to put in it</th><th>Used by the model?</th></tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><code>student_id</code></td><td><span class="badge badge-danger">Required</span></td>
+                <td>Any unique ID, e.g. <code>AUF-2526-0001</code></td><td>No — identifies the student only</td>
+            </tr>
+            <tr>
+                <td><code>program</code></td><td><span class="badge badge-danger">Required</span></td>
+                <td>{{ known_programs | join(" / ") }}</td><td>Yes</td>
+            </tr>
+            <tr>
+                <td><code>year_level</code></td><td><span class="badge badge-danger">Required</span></td>
+                <td>1, 2, 3 …</td><td>Yes</td>
+            </tr>
+            <tr>
+                <td><code>first_sem_gwa</code></td><td><span class="badge badge-danger">Required</span></td>
+                <td>1st-semester GWA on AUF's percentage scale, e.g. <code>88.75</code></td><td>Yes — the strongest factor</td>
+            </tr>
+            <tr>
+                <td><code>target_class</code></td><td><span class="badge badge-info">Optional</span></td>
+                <td>At-Risk / Stable / High-Performing, if already known</td><td>No — only shown next to the AI's prediction for comparison</td>
+            </tr>
+        </tbody>
+    </table>
+    </div>
+    <p class="text-muted mt-20" style="font-size:12.5px;">
+        Other columns (annual or 2nd-semester GWA, attendance, LMS activity, total classes, age, sex …) are ignored and
+        listed in the cleaning report. Rows missing a model input are excluded rather than guessed (manuscript 3.2.3.2).
     </p>
 </div>
 
@@ -84,8 +124,8 @@
     </div>
     <p class="text-muted mb-20">
         Export the currently loaded (cleaned) dataset, optionally enriched with
-        computed columns (GWA, attendance %, LMS activity level, and the AI's
-        predicted class, confidence and At-Risk probability if the model is loaded).
+        the AI's predicted class, confidence and At-Risk probability (if the model is
+        loaded) and the GWA band each student falls into.
     </p>
     {% if has_dataset %}
     <a href="{{ url_for('download_dataset') }}" class="btn">Download Cleaned Dataset (CSV)</a>
@@ -100,15 +140,18 @@
     <h3>Last Cleaning Report</h3>
     <p class="text-muted mb-20">
         {{ clean_report.filename }} — cleaned {{ clean_report.cleaned_at }} —
-        {{ "{:,}".format(clean_report.original_rows) }} rows in,
-        {{ "{:,}".format(clean_report.final_rows) }} rows out.
+        {{ "{:,}".format(clean_report.original_rows or 0) }} rows in,
+        {{ "{:,}".format(clean_report.final_rows or 0) }} rows out.
     </p>
     <ul class="model-file-list">
         <li>Empty rows removed: <strong>{{ clean_report.empty_rows_removed }}</strong></li>
         <li>Exact duplicate rows removed: <strong>{{ clean_report.duplicate_rows_removed }}</strong></li>
         <li>Duplicate Student IDs removed (kept first): <strong>{{ clean_report.duplicate_ids_removed }}</strong></li>
-        <li>Excluded — missing a critical model input: <strong>{{ clean_report.excluded_missing_critical or 0 }}</strong></li>
-        <li>Excluded — more than 20% of attributes missing: <strong>{{ clean_report.excluded_too_many_missing or 0 }}</strong></li>
+        <li>Excluded — missing a model input (program, year level or 1st-semester GWA): <strong>{{ clean_report.excluded_missing_critical or 0 }}</strong>
+            {% if clean_report.excluded_by_column %}
+            <span class="text-muted">(missing {% for col, n in clean_report.excluded_by_column.items() %}{{ col }}: {{ n }}{{ ", " if not loop.last }}{% endfor %})</span>
+            {% endif %}
+        </li>
         {% if clean_report.sheet %}
         <li>Sheet read: <strong>{{ clean_report.sheet }}</strong></li>
         {% endif %}
@@ -122,11 +165,13 @@
         {% if clean_report.demographic_columns_removed %}
         <li>Demographic columns removed (outside study scope): <strong>{{ clean_report.demographic_columns_removed | join(", ") }}</strong></li>
         {% endif %}
-        {% if clean_report.unknown_columns_ignored %}
-        <li>Columns not in the schema (ignored): <strong>{{ clean_report.unknown_columns_ignored | join(", ") }}</strong></li>
+        {% if clean_report.unused_columns_ignored %}
+        <li>Columns not used by the model (ignored): <strong>{{ clean_report.unused_columns_ignored | join(", ") }}</strong></li>
         {% endif %}
-        {% if clean_report.rates_converted_from_percent %}
-        <li>Rates converted from percent to 0–1: <strong>{{ clean_report.rates_converted_from_percent | join(", ") }}</strong></li>
+        {% if clean_report.unknown_programs %}
+        <li class="text-warning">Programs the model wasn't trained on (kept, but predicted with less certainty):
+            {% for prog, n in clean_report.unknown_programs.items() %}<strong>{{ prog }}</strong> ({{ n }}){{ ", " if not loop.last }}{% endfor %}
+        </li>
         {% endif %}
         {% if clean_report.labels_unrecognized %}
         <li>Unrecognized target_class values cleared: <strong>{{ clean_report.labels_unrecognized }}</strong></li>
@@ -158,13 +203,7 @@
             {% endfor %}
         </li>
         {% endif %}
-        {% if clean_report.values_imputed %}
-        <li>Missing values filled in:
-            {% for col, info in clean_report.values_imputed.items() %}
-                <strong>{{ col }}</strong> ({{ info.count }} filled with {{ info.method }}: {{ info.value }}){{ ", " if not loop.last }}
-            {% endfor %}
-        </li>
-        {% endif %}
+        <li class="text-muted">No values are invented: every column kept is a model input, so a missing value excludes the record instead of being filled in.</li>
     </ul>
 </div>
 {% endif %}
@@ -178,13 +217,18 @@
     </div>
     <p>
         Live AI predictions use the deployable bundle exported by the training notebook
-        (<code>Dataset_Training.ipynb</code> → "Export .pkl files"):
+        (<code>AURA-Final-Model-Training.ipynb</code> → "Deployable Model"):
     </p>
     <ul class="model-file-list">
-        <li><code>models/AURA_model_bundle.pkl</code> — fitted pipeline + metadata {% if model_files_present.bundle %}✅{% else %}❌{% endif %}</li>
+        <li><code>models/{{ model_files_present.bundle_name }}</code> — fitted pipeline + metadata {% if model_files_present.bundle %}✅{% else %}❌{% endif %}</li>
         <li><code>aura_transformers.py</code> — the notebook's custom pipeline classes (next to <code>app.py</code>) {% if model_files_present.transformers %}✅{% else %}❌{% endif %}</li>
-        <li><code>shap</code> library — exact SHAP explanations {% if model_files_present.shap %}✅{% else %}⚠️ not installed (an approximate tree-path explanation is used instead){% endif %}</li>
+        <li><code>xgboost</code> library — runs the selected model {% if model_files_present.xgboost %}✅{% else %}❌ not installed (<code>pip install -r requirements.txt</code>){% endif %}</li>
+        <li><code>models/AURA_model_report.json</code> — cross-validation / baseline results for the Model Card {% if model_files_present.report %}✅{% else %}⚠️ optional, not found{% endif %}</li>
+        <li><code>shap</code> library — {% if model_files_present.shap %}✅ SHAP TreeExplainer{% else %}not loaded — XGBoost's built-in TreeSHAP gives the same exact values{% endif %}</li>
     </ul>
+    {% if model_files_present.old_pkl_also_present %}
+    <p class="text-warning mt-20">⚠️ Both <code>AURA_model_bundle.joblib</code> and an older <code>AURA_model_bundle.pkl</code> are in <code>models/</code>. The .joblib (new model) is used — delete the old .pkl to avoid confusion.</p>
+    {% endif %}
 
     {% if model_info %}
     <div class="mt-30">
@@ -192,7 +236,7 @@
         <ul class="model-file-list">
             <li>Selected model: <strong>{{ model_info.selected_model }}</strong></li>
             <li>Classes: <strong>{{ model_info.class_order | join(" · ") }}</strong></li>
-            <li>Features the model uses: <strong>{{ model_info.friendly_features | unique | join(", ") }}</strong></li>
+            <li>Inputs the model uses: <strong>{{ model_info.friendly_features | unique | join(", ") }}</strong></li>
             <li>Explanations: <strong>{{ model_info.explainer }}</strong></li>
             {% if model_info.version_mismatch %}
             <li class="text-warning">⚠️ Trained with scikit-learn {{ model_info.trained_sklearn }}, but {{ model_info.installed_sklearn }} is installed. Run <code>pip install -r requirements.txt</code> to match the training version.</li>

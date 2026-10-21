@@ -4,32 +4,35 @@ Flask web app for the "Implementation and Evaluation of a Supervised Machine
 Learning Model with Explainable AI for Predicting At-Risk and High-Performing
 College Students" thesis project.
 
-## What changed in this version (October 2026)
+## What changed in this version (panel revision, October 2026)
 
-- **New model:** one file, `models/AURA_model_bundle.pkl`, exported by
-  `Dataset_Training.ipynb` - the notebook's selected **KMeans + Random
-  Forest** pipeline (tied with the top repeated-CV macro-F1, highest
-  At-Risk recall among tied models, exact SHAP). It replaces the old
-  Best_Model/Scaler/TargetEncoder/Categorical_Encoders files.
-  `aura_transformers.py` (next to `app.py`) is required to load it.
-- **New data schema:** the AURA AY 2025-2026 dataset (24 columns +
-  optional `target_class`, no demographics). The xlsx `dataset` sheet is
-  read automatically, and `first_sem_gwa(previous_gwa)` is recognized.
-- **Three classes:** At-Risk / Stable / High-Performing everywhere.
-  The model's prediction is each student's status, so unlabeled files
-  work; a recorded `target_class` is shown alongside when present.
-- **Database:** the `students` table now uses the dataset's own column
-  names. Existing installs migrate automatically on first start (only the
-  old students rows are replaced; accounts, uploads history, checklists
-  and action plans are kept).
-- **Manuscript alignment:** exclusion criteria (missing critical inputs,
-  >20% missing), plain-language explanations, non-binding /
-  human-in-the-loop notes, remediation + enrichment + monitoring
-  pathways and explanation-driven suggestions (Sections 2.7.2-2.7.4),
-  and a Model Card with the held-out test metrics.
-- **UI fixes:** the password show/hide toggle is now a simple eye icon
-  inside the field, and the Upload page shows the chosen file's name
-  (and a "Currently loaded" indicator after uploading).
+Changes made after the defense, following the panel's ODRF recommendations
+and the updated `AURA-Final-Model-Training.ipynb`:
+
+- **New model: XGBoost** (`models/AURA_model_bundle.joblib`). In the
+  notebook's repeated CV it is statistically tied with the best macro-F1
+  (the RF+XGBoost hybrid) and, unlike the hybrid, is explained exactly by
+  TreeSHAP. **K-Means and "total scheduled classes" were removed** - the
+  ablation showed re-adding them has no significant effect.
+- **Only the columns that feed the prediction are asked for.** An upload
+  needs `student_id, program, year_level, first_sem_gwa` (+ optional
+  `target_class`, never used to predict). Any other column in the file is
+  ignored and listed in the cleaning report. A template CSV can be
+  downloaded from the Upload page.
+- **Database:** the `students` table now stores only those columns plus
+  the model's outputs. Existing databases are **migrated automatically**
+  on first start (student rows kept, unused columns dropped, everyone
+  re-classified by the new model). Manual SQL is in `migrations/`.
+- **Model Card** now also shows repeated cross-validation on all 281
+  students, the comparison with the rule-based baseline (82/90 on the
+  1st-semester GWA) and what the model does not use
+  (`models/AURA_model_report.json`).
+- **Pages updated** for the three inputs: Insights shows where the
+  1st-semester GWA sits on the 82 / 90 cut-offs, Analytics shows
+  classification by year level instead of (simulated) attendance, and the
+  policy stage is estimated from the 1st-semester GWA.
+- Explanations use SHAP TreeExplainer if `shap` is installed, otherwise
+  XGBoost's built-in TreeSHAP - the same exact values with less memory.
 
 ## First-time setup
 
@@ -124,8 +127,8 @@ blocks.
 - **Students** — searchable table (Student ID, Program, Year Level,
   minimum GWA, status) with each prediction's confidence, plus
   **Download Results** for exactly the filtered rows.
-- **Student Insights** — GWA / 1st-semester GWA / attendance / LMS
-  activity, the live prediction with all three class probabilities (and
+- **Student Insights** — 1st-semester GWA, program, year level and At-Risk
+  probability, where the GWA sits on the 82 / 90 cut-offs, the live prediction with all three class probabilities (and
   the recorded class if the file had one), Key Factors bars sized by SHAP
   per factor group, and Recommended Actions.
   - **Explanation** → plain-language factor cards + technical SHAP table.
@@ -134,16 +137,17 @@ blocks.
     plus suggestions driven by the student's own explanation.
   - **Edit** → change any field; the student is re-classified on save.
 - **Upload Dataset** — .csv / .xlsx / .xls only; required columns
-  `student_id, program, year_level, first_sem_gwa, total_classes`.
-  Cleaning (`utils/cleaning.py`) maps header aliases, removes demographic
-  columns, drops empty/duplicate rows and duplicate IDs, coerces and clips
-  values, converts percent rates to 0-1, applies the manuscript's
-  exclusion criteria, and imputes the rest (never the label) - all shown
-  in the Cleaning Report. Every student is then classified in one batch.
-- **Analytics** — average GWA, attendance, class distribution,
-  attendance by year level, classification by program, top predictors
-  (mean |SHAP|), and a **Model Card** with the notebook's held-out test
-  metrics.
+  `student_id, program, year_level, first_sem_gwa` (optional
+  `target_class`), with a downloadable template. Cleaning
+  (`utils/cleaning.py`) maps header aliases, drops columns the model doesn't
+  use (and demographics), removes empty/duplicate rows and duplicate IDs,
+  coerces and clips values ("2nd" -> 2, GWA 104 -> 100), normalizes program
+  codes and labels, and excludes records missing a model input (manuscript
+  3.2.3.2) - nothing is imputed. Every student is then classified in one batch.
+- **Analytics** — average 1st-semester GWA, average At-Risk probability,
+  class distribution, classification by year level and by program, top
+  predictors (mean |SHAP|), and a **Model Card** (held-out test metrics,
+  repeated CV, rule-baseline comparison, excluded inputs).
 - **Recommendations** — At-Risk (intervene) / Stable (monitor) /
   High-Performing (enrich) counts, the three AUF policy stages, the
   monitoring and enrichment pathways, the At-Risk list sorted by
@@ -197,7 +201,7 @@ flaskapp/
 ├── services/
 │   ├── auth_service.py          Signup/login logic (password hashing)
 │   ├── data_service.py          Dataset loading/saving - DB-backed, per-teacher scoped
-│   ├── model_service.py         Loads AURA_model_bundle.pkl, batch predicts, SHAP explanations
+│   ├── model_service.py         Loads AURA_model_bundle.joblib, batch predicts, SHAP explanations
 │   ├── intervention_service.py  Tracks the policy checklist per student
 │   └── action_plan_service.py   Teacher Action Plan reminders/scheduling
 ├── utils/
@@ -211,7 +215,7 @@ flaskapp/
 │   ├── js/password-toggle.js    Show/hide password eye icon
 │   └── img/auf_logo.png         AUF seal
 └── models/
-    └── AURA_model_bundle.pkl    The selected model (see models/README.md)
+    └── AURA_model_bundle.joblib    The selected model (see models/README.md)
 ```
 
 ## Running it
@@ -229,7 +233,7 @@ Sign up for your first account, then log in.
 
 ## Getting real data & predictions flowing
 
-1. The model is already in place (`models/AURA_model_bundle.pkl` +
+1. The model is already in place (`models/AURA_model_bundle.joblib` +
    `aura_transformers.py`). The Upload page's **Model Files** section
    confirms it loaded and shows the selected model.
 2. Log in, go to **Upload Dataset** and upload the AURA workbook (or any
@@ -251,9 +255,8 @@ banner and safe fallback content until it's added.
   or a manual database fix today.
 - No way to add a brand-new student by hand outside of a CSV/XLSX upload
   (existing students can be edited).
-- Exact SHAP needs the `shap` package (in requirements.txt). If it isn't
-  installed, the app still explains predictions with a tree-path
-  decomposition (Saabas method) that approximates SHAP, and labels it as such.
+- Exact explanations: with `shap` installed the app uses SHAP
+  TreeExplainer; without it, XGBoost's built-in TreeSHAP (same values).
 - Email/push notifications for the Teacher Action Plan — the "Notification
   basing on status" request was interpreted as in-app badges + a dashboard
   banner, not actual emails or push notifications, since no email service

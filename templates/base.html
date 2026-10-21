@@ -65,7 +65,7 @@
             {% if not has_dataset %}
                 <span>📂 No dataset loaded yet — visit <a href="{{ url_for('upload') }}">Upload Dataset</a> to get started. Showing demo data for now.</span>
             {% elif not model_ready %}
-                <span>🤖 Dataset loaded, but the trained model isn't available yet. AI predictions are off until <code>models/AURA_model_bundle.pkl</code> and <code>aura_transformers.py</code> are in place — see <a href="{{ url_for('upload') }}">Upload Dataset → Model Files</a>.</span>
+                <span>🤖 Dataset loaded, but the trained model isn't available yet. AI predictions are off until <code>models/AURA_model_bundle.joblib</code> and <code>aura_transformers.py</code> are in place — see <a href="{{ url_for('upload') }}">Upload Dataset → Model Files</a>.</span>
             {% endif %}
         </div>
         {% endif %}

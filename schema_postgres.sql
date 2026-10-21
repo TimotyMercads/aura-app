@@ -53,43 +53,25 @@ CREATE INDEX IF NOT EXISTS idx_uploads_owner ON uploads (uploaded_by);
 -- (see data_service.save_dataset) - other teachers' students are
 -- untouched.
 --
--- Columns = the AURA AY 2025-2026 dataset sheet (no demographics) plus
--- the model's outputs (predicted_class, prediction_confidence,
--- prob_at_risk). target_class is optional (unlabeled students are
--- classified by the model).
+-- PANEL REVISION (ODRF): only the columns the model actually uses are
+-- stored - program, year_level, first_sem_gwa - plus student_id, the
+-- optional recorded class (target_class, never used to predict) and the
+-- model's outputs (predicted_class, prediction_confidence, prob_at_risk).
 --
--- UPGRADING from the previous AURA version? Nothing to do by hand: on
--- first start the app detects the old students table (Student_ID,
--- Previous_GPA, ...) and recreates it with these columns. Users, upload
--- history, checklists and action plans are kept.
+-- UPGRADING an existing database? Nothing to do by hand: on first start
+-- the app migrates the old students table in place (keeps student_id,
+-- program, year_level, first_sem_gwa, target_class; drops the attendance /
+-- LMS / annual-GWA columns; re-classifies with the new model). Users,
+-- upload history, checklists and action plans are kept. To do it by hand
+-- instead, run migrations/2026-10_panel_revision_*.sql.
 -- ------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS students (
     id SERIAL PRIMARY KEY,
     upload_id INT NULL REFERENCES uploads(id) ON DELETE SET NULL,
     student_id VARCHAR(50) NOT NULL,
-    academic_year VARCHAR(20) NULL,
-    semester VARCHAR(60) NULL,
     program VARCHAR(20) NULL,
     year_level INT NULL,
-    gwa FLOAT NULL,
     first_sem_gwa FLOAT NULL,
-    assignment_average FLOAT NULL,
-    second_sem_gwa FLOAT NULL,
-    total_classes INT NULL,
-    classes_attended INT NULL,
-    absences INT NULL,
-    attendance_rate FLOAT NULL,
-    absenteeism_rate FLOAT NULL,
-    lms_login_count INT NULL,
-    lms_resource_views INT NULL,
-    lms_assignment_submissions INT NULL,
-    on_time_submissions INT NULL,
-    late_submissions INT NULL,
-    lms_activity_count INT NULL,
-    avg_weekly_lms_logins FLOAT NULL,
-    avg_daily_activity FLOAT NULL,
-    first_activity_date DATE NULL,
-    last_activity_date DATE NULL,
     target_class VARCHAR(20) NULL,
     predicted_class VARCHAR(20) NULL,
     prediction_confidence FLOAT NULL,

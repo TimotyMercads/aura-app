@@ -22,12 +22,13 @@ student, matching how Program Chairs/Deans are expected to document
 compliance in the real policy.
 
 NOTE ON STAGE DETECTION: the source policy triggers stages from actual
-quiz/requirement failures and official midterm/final grades. The AURA
-AY 2025-2026 dataset has semester-level GWAs instead (1st-semester,
-2nd-semester and annual, on AUF's percentage scale where 75 is passing).
-determine_stage() below maps those to the closest stage as a heuristic -
-it is disclosed as such everywhere it's used, not presented as if it were
-the literal policy trigger.
+quiz/requirement failures and official midterm/final grades. After the
+panel revision the app only receives the model's inputs, so the only grade
+on hand is the 1st-semester GWA (AUF percentage scale, 75 = passing).
+determine_stage() maps it to the closest stage as a heuristic - it is
+disclosed as such everywhere it's used, not presented as if it were the
+literal policy trigger. Stage 3 (a failing FINAL grade) cannot be detected
+from a first-semester grade, so the teacher selects it from the checklist.
 
 The manuscript's decision-support framework (Sections 2.7.2-2.7.4) adds:
   - remediation strategies for At-Risk students,
@@ -178,7 +179,7 @@ POLICY_REMINDERS = [
 # --------------------------------------------------------------------------
 
 PASSING_GRADE = 75          # AUF passing grade (dataset Validation sheet)
-AT_RISK_CUTOFF = 82         # At-Risk: annual GWA <= 82 (operational definition)
+AT_RISK_CUTOFF = 82         # At-Risk: annual GWA <= 82 (label definition used in training)
 HIGH_PERFORMING_CUTOFF = 90 # High-Performing: annual GWA >= 90
 
 # Manuscript 2.7.2 - common remediation strategies in higher education
@@ -217,21 +218,10 @@ SUGGESTIONS_BY_LABEL = {
 # prediction -> which action to consider. "risk" texts are used when the
 # factor works AGAINST a strong outcome, "support" texts when it works FOR it.
 FACTOR_ACTIONS = {
+    # ---- the three inputs of the final model ----
     "first_sem_gwa": {
         "risk": "1st-semester GWA is the main factor: arrange structured tutoring or supplemental instruction and an academic advising consultation.",
         "support": "Strong 1st-semester GWA: consider honors/accelerated coursework or competitive scholarship preparation.",
-    },
-    "gwa": {
-        "risk": "Annual GWA is a key factor: review subject-level grades with the student and plan remediation for the weakest subjects.",
-        "support": "Strong annual GWA: recommend for Dean's List recognition or research assistantship.",
-    },
-    "second_sem_gwa": {
-        "risk": "2nd-semester GWA is a key factor: debrief with the student on what changed and adjust the support plan.",
-        "support": "Strong 2nd-semester GWA: consider leadership or peer-mentor roles.",
-    },
-    "total_classes": {
-        "risk": "Course load is contributing: review with the academic adviser whether the current number of subjects is manageable.",
-        "support": "Course load is in a favorable range: no load adjustment needed.",
     },
     "year_level": {
         "risk": "Year-level pattern is contributing: provide transition support (orientation, peer mentoring with upper-year students).",
@@ -241,25 +231,14 @@ FACTOR_ACTIONS = {
         "risk": "Program pattern is contributing: coordinate with the Program Chair on program-specific supplemental instruction.",
         "support": "Program pattern is favorable: encourage program-related competitions or certification tracks.",
     },
+    # ---- only used if an older model bundle is loaded ----
+    "total_classes": {
+        "risk": "Course load is contributing: review with the academic adviser whether the current number of subjects is manageable.",
+        "support": "Course load is in a favorable range: no load adjustment needed.",
+    },
     "student_group": {
         "risk": "The student's K-Means peer group leans weaker: consider group study sessions or peer mentoring.",
         "support": "The student's K-Means peer group leans stronger: invite the student to lead a study group.",
-    },
-    "attendance_rate": {
-        "risk": "Attendance is contributing: start attendance monitoring and check in about barriers to attending.",
-        "support": "Good attendance: acknowledge the consistency.",
-    },
-    "absences": {
-        "risk": "Absences are contributing: start attendance monitoring and check in about barriers to attending.",
-        "support": "Few absences: acknowledge the consistency.",
-    },
-    "lms_login_count": {
-        "risk": "Low LMS engagement is contributing: set up structured engagement monitoring or guided study sessions.",
-        "support": "High LMS engagement: point the student to advanced learning resources.",
-    },
-    "assignment_average": {
-        "risk": "Assignment performance is contributing: review submission quality and offer guided practice.",
-        "support": "Strong assignment performance: offer challenge tasks or project-based enrichment.",
     },
 }
 
@@ -292,23 +271,22 @@ def determine_stage(row, prediction_label=None):
     Heuristically maps a student's data to the closest matching policy
     stage. Returns None if the student isn't on an at-risk track.
 
-    Uses the semester GWAs (AUF percentage scale, 75 = passing):
-      Stage 3 - the year-end grade is not passing (annual or 2nd-sem GWA < 75)
-      Stage 2 - the 1st-semester (earlier-term) GWA is not passing (< 75)
-      Stage 1 - classified At-Risk without a failing term GWA (early warning)
+    Uses the 1st-semester GWA (AUF percentage scale, 75 = passing) - the only
+    grade the app receives after the panel revision:
+      Stage 2 - the 1st-semester GWA is not passing (< 75): the earlier-term
+                grade already shows a failing result
+      Stage 1 - classified At-Risk with a passing 1st-semester GWA (early
+                warning, before any failing grade)
+    Stage 3 depends on a FINAL grade the app doesn't have, so it is never
+    auto-selected - the teacher moves to it on the checklist when it applies.
 
-    A heuristic from the columns the dataset actually has - not the policy's
-    literal triggers (specific quiz failures, official midterm/final grades).
-    Always disclosed as such in the UI.
+    A heuristic, not the policy's literal triggers (specific quiz failures,
+    official midterm/final grades). Always disclosed as such in the UI.
     """
     label = prediction_label or row.get("target_class")
     if label != "At-Risk":
         return None
-    gwa = _safe_float(row.get("gwa"))
-    second = _safe_float(row.get("second_sem_gwa"))
     first = _safe_float(row.get("first_sem_gwa"))
-    if (gwa is not None and gwa < PASSING_GRADE) or (second is not None and second < PASSING_GRADE):
-        return 3
     if first is not None and first < PASSING_GRADE:
         return 2
     return 1

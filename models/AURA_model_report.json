@@ -1,0 +1,423 @@
+{
+  "source": "AURA-Final-Model-Training.ipynb",
+  "selected_model": "XGBoost",
+  "dataset": {
+    "students": 281,
+    "classes": {
+      "At-Risk": 12,
+      "Stable": 106,
+      "High-Performing": 163
+    },
+    "train_students": 196,
+    "test_students": 85,
+    "test_at_risk": 4,
+    "label_rule": "At-Risk = annual GWA <= 82, High-Performing = annual GWA >= 90"
+  },
+  "inputs": [
+    "first_sem_gwa",
+    "year_level",
+    "program"
+  ],
+  "excluded": {
+    "label_leakage": [
+      "gwa",
+      "second_sem_gwa"
+    ],
+    "simulated": [
+      "assignment_average",
+      "classes_attended",
+      "absences",
+      "attendance_rate",
+      "absenteeism_rate",
+      "lms_login_count",
+      "lms_resource_views",
+      "lms_assignment_submissions",
+      "on_time_submissions",
+      "late_submissions",
+      "lms_activity_count",
+      "avg_weekly_lms_logins",
+      "avg_daily_activity",
+      "first_activity_date",
+      "last_activity_date"
+    ],
+    "panel_revision": [
+      "K-Means clustering step",
+      "total_classes"
+    ]
+  },
+  "selection_cv_train": {
+    "Hybrid RF+XGBoost": {
+      "F1 (macro)": [
+        0.8179,
+        0.086
+      ],
+      "At-Risk Recall": 0.77,
+      "exact_shap": false
+    },
+    "XGBoost": {
+      "F1 (macro)": [
+        0.8154,
+        0.0832
+      ],
+      "At-Risk Recall": 0.77,
+      "exact_shap": true
+    },
+    "Random Forest": {
+      "F1 (macro)": [
+        0.7936,
+        0.1201
+      ],
+      "At-Risk Recall": 0.73,
+      "exact_shap": true
+    },
+    "MLP": {
+      "F1 (macro)": [
+        0.5787,
+        0.0484
+      ],
+      "At-Risk Recall": 0.01,
+      "exact_shap": false
+    }
+  },
+  "repeated_cv_all": {
+    "Random Forest": {
+      "F1 (macro)": [
+        0.725,
+        0.09
+      ],
+      "MCC": [
+        0.736,
+        0.072
+      ],
+      "At-Risk Recall": [
+        0.603,
+        0.338
+      ],
+      "At-Risk Precision": [
+        0.367,
+        0.234
+      ],
+      "Accuracy": [
+        0.858,
+        0.04
+      ]
+    },
+    "XGBoost": {
+      "F1 (macro)": [
+        0.754,
+        0.082
+      ],
+      "MCC": [
+        0.739,
+        0.074
+      ],
+      "At-Risk Recall": [
+        0.657,
+        0.3
+      ],
+      "At-Risk Precision": [
+        0.492,
+        0.234
+      ],
+      "Accuracy": [
+        0.86,
+        0.04
+      ]
+    },
+    "MLP": {
+      "F1 (macro)": [
+        0.58,
+        0.028
+      ],
+      "MCC": [
+        0.726,
+        0.083
+      ],
+      "At-Risk Recall": [
+        0.01,
+        0.071
+      ],
+      "At-Risk Precision": [
+        0.003,
+        0.018
+      ],
+      "Accuracy": [
+        0.858,
+        0.047
+      ]
+    },
+    "Hybrid RF+XGBoost": {
+      "F1 (macro)": [
+        0.756,
+        0.081
+      ],
+      "MCC": [
+        0.745,
+        0.071
+      ],
+      "At-Risk Recall": [
+        0.643,
+        0.297
+      ],
+      "At-Risk Precision": [
+        0.509,
+        0.261
+      ],
+      "Accuracy": [
+        0.864,
+        0.038
+      ]
+    },
+    "Rule: 1st-sem GWA 82/90": {
+      "F1 (macro)": [
+        0.789,
+        0.096
+      ],
+      "MCC": [
+        0.774,
+        0.075
+      ],
+      "At-Risk Recall": [
+        0.583,
+        0.3
+      ],
+      "At-Risk Precision": [
+        0.7,
+        0.332
+      ],
+      "Accuracy": [
+        0.883,
+        0.038
+      ]
+    },
+    "Logistic Regression": {
+      "F1 (macro)": [
+        0.787,
+        0.072
+      ],
+      "MCC": [
+        0.762,
+        0.084
+      ],
+      "At-Risk Recall": [
+        0.813,
+        0.22
+      ],
+      "At-Risk Precision": [
+        0.53,
+        0.22
+      ],
+      "Accuracy": [
+        0.871,
+        0.047
+      ]
+    },
+    "Decision Tree": {
+      "F1 (macro)": [
+        0.713,
+        0.082
+      ],
+      "MCC": [
+        0.68,
+        0.081
+      ],
+      "At-Risk Recall": [
+        0.573,
+        0.3
+      ],
+      "At-Risk Precision": [
+        0.453,
+        0.27
+      ],
+      "Accuracy": [
+        0.827,
+        0.045
+      ]
+    }
+  },
+  "cv_scheme": "5-fold stratified CV x 10 repeats on all 281 students",
+  "rule_name": "Rule: 1st-sem GWA 82/90",
+  "vs_rule": {
+    "F1 (macro)": {
+      "difference vs rule": -0.035,
+      "95% CI low": -0.121,
+      "95% CI high": 0.052,
+      "p": 0.423,
+      "verdict": "no significant difference"
+    },
+    "At-Risk Recall": {
+      "difference vs rule": 0.073,
+      "95% CI low": -0.185,
+      "95% CI high": 0.332,
+      "p": 0.572,
+      "verdict": "no significant difference"
+    },
+    "At-Risk Precision": {
+      "difference vs rule": -0.208,
+      "95% CI low": -0.521,
+      "95% CI high": 0.105,
+      "p": 0.187,
+      "verdict": "no significant difference"
+    }
+  },
+  "ablation": [
+    {
+      "variant": "XGBoost (with total scheduled classes)",
+      "metric": "F1 (macro)",
+      "difference": 0.027,
+      "95% CI low": -0.031,
+      "95% CI high": 0.085,
+      "p": 0.355,
+      "verdict": "no significant effect"
+    },
+    {
+      "variant": "XGBoost (with total scheduled classes)",
+      "metric": "At-Risk Recall",
+      "difference": 0.053,
+      "95% CI low": -0.131,
+      "95% CI high": 0.238,
+      "p": 0.563,
+      "verdict": "no significant effect"
+    },
+    {
+      "variant": "XGBoost + K-Means (k=2)",
+      "metric": "F1 (macro)",
+      "difference": 0.0,
+      "95% CI low": 0.0,
+      "95% CI high": 0.0,
+      "p": 1.0,
+      "verdict": "no significant effect"
+    },
+    {
+      "variant": "XGBoost + K-Means (k=2)",
+      "metric": "At-Risk Recall",
+      "difference": 0.0,
+      "95% CI low": 0.0,
+      "95% CI high": 0.0,
+      "p": 1.0,
+      "verdict": "no significant effect"
+    },
+    {
+      "variant": "XGBoost + K-Means (k=3)",
+      "metric": "F1 (macro)",
+      "difference": 0.0,
+      "95% CI low": 0.0,
+      "95% CI high": 0.0,
+      "p": 1.0,
+      "verdict": "no significant effect"
+    },
+    {
+      "variant": "XGBoost + K-Means (k=3)",
+      "metric": "At-Risk Recall",
+      "difference": 0.0,
+      "95% CI low": 0.0,
+      "95% CI high": 0.0,
+      "p": 1.0,
+      "verdict": "no significant effect"
+    },
+    {
+      "variant": "XGBoost + K-Means (k=4)",
+      "metric": "F1 (macro)",
+      "difference": -0.003,
+      "95% CI low": -0.02,
+      "95% CI high": 0.015,
+      "p": 0.767,
+      "verdict": "no significant effect"
+    },
+    {
+      "variant": "XGBoost + K-Means (k=4)",
+      "metric": "At-Risk Recall",
+      "difference": -0.013,
+      "95% CI low": -0.082,
+      "95% CI high": 0.056,
+      "p": 0.699,
+      "verdict": "no significant effect"
+    }
+  ],
+  "test_metrics_all": {
+    "Logistic Regression": {
+      "Accuracy": 0.8353,
+      "Precision (macro)": 0.7049,
+      "Recall (macro)": 0.7957,
+      "Specificity (macro)": 0.9109,
+      "F1 (macro)": 0.7283,
+      "MCC": 0.6976,
+      "At-Risk Recall": 0.75,
+      "At-Risk Precision": 0.375,
+      "ROC-AUC (OvR macro)": 0.9336,
+      "PR-AUC (macro)": 0.7632
+    },
+    "Decision Tree": {
+      "Accuracy": 0.8118,
+      "Precision (macro)": 0.697,
+      "Recall (macro)": 0.7821,
+      "Specificity (macro)": 0.8932,
+      "F1 (macro)": 0.7247,
+      "MCC": 0.6513,
+      "At-Risk Recall": 0.75,
+      "At-Risk Precision": 0.4286,
+      "ROC-AUC (OvR macro)": 0.869,
+      "PR-AUC (macro)": 0.6565
+    },
+    "Rule: 1st-sem GWA 82/90": {
+      "Accuracy": 0.8353,
+      "Precision (macro)": 0.6726,
+      "Recall (macro)": 0.6463,
+      "Specificity (macro)": 0.8985,
+      "F1 (macro)": 0.6569,
+      "MCC": 0.6803,
+      "At-Risk Recall": 0.25,
+      "At-Risk Precision": 0.3333,
+      "ROC-AUC (OvR macro)": 0.7724,
+      "PR-AUC (macro)": 0.5595
+    },
+    "Random Forest": {
+      "Accuracy": 0.7882,
+      "Precision (macro)": 0.5987,
+      "Recall (macro)": 0.6046,
+      "Specificity (macro)": 0.8872,
+      "F1 (macro)": 0.5921,
+      "MCC": 0.6083,
+      "At-Risk Recall": 0.25,
+      "At-Risk Precision": 0.125,
+      "ROC-AUC (OvR macro)": 0.9409,
+      "PR-AUC (macro)": 0.7739
+    },
+    "XGBoost": {
+      "Accuracy": 0.8,
+      "Precision (macro)": 0.6258,
+      "Recall (macro)": 0.6295,
+      "Specificity (macro)": 0.8877,
+      "F1 (macro)": 0.6268,
+      "MCC": 0.6247,
+      "At-Risk Recall": 0.25,
+      "At-Risk Precision": 0.25,
+      "ROC-AUC (OvR macro)": 0.8878,
+      "PR-AUC (macro)": 0.7152
+    },
+    "MLP": {
+      "Accuracy": 0.8588,
+      "Precision (macro)": 0.5664,
+      "Recall (macro)": 0.5906,
+      "Specificity (macro)": 0.9067,
+      "F1 (macro)": 0.578,
+      "MCC": 0.7213,
+      "At-Risk Recall": 0.0,
+      "At-Risk Precision": 0.0,
+      "ROC-AUC (OvR macro)": 0.9317,
+      "PR-AUC (macro)": 0.7521
+    },
+    "Hybrid RF+XGBoost": {
+      "Accuracy": 0.8118,
+      "Precision (macro)": 0.6222,
+      "Recall (macro)": 0.6327,
+      "Specificity (macro)": 0.8962,
+      "F1 (macro)": 0.6265,
+      "MCC": 0.645,
+      "At-Risk Recall": 0.25,
+      "At-Risk Precision": 0.2,
+      "ROC-AUC (OvR macro)": 0.9442,
+      "PR-AUC (macro)": 0.7855
+    }
+  }
+}

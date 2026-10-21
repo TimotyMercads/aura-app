@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.base import BaseEstimator, ClassifierMixin, TransformerMixin
 from sklearn.cluster import KMeans
 from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
@@ -141,3 +141,25 @@ class ClusterFeatureAdder(BaseEstimator, TransformerMixin):
         for k in range(self.n_clusters):
             out[f"cluster_{k}"] = (labels == k).astype(int)
         return out
+
+
+class RuleBaseline(BaseEstimator, ClassifierMixin):
+    """PANEL REVISION - rule-based baseline: applies the label cut-offs directly to the 1st-semester GWA.
+    No learning. Classes: 0 = At-Risk, 1 = Stable, 2 = High-Performing."""
+
+    def __init__(self, column="first_sem_gwa", at_risk_max=82.0, high_min=90.0):
+        self.column = column
+        self.at_risk_max = at_risk_max
+        self.high_min = high_min
+
+    def fit(self, X, y=None, sample_weight=None):
+        self.classes_ = np.array([0, 1, 2])
+        return self
+
+    def predict_proba(self, X):
+        g = pd.to_numeric(pd.DataFrame(X)[self.column], errors="coerce").to_numpy(dtype=float)
+        k = np.where(g <= self.at_risk_max, 0, np.where(g >= self.high_min, 2, 1))
+        return np.eye(3)[k]
+
+    def predict(self, X):
+        return self.predict_proba(X).argmax(1)

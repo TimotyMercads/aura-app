@@ -1,14 +1,19 @@
 Flask>=3.0
 Flask-Login>=0.6
-# The model (models/AURA_model_bundle.pkl) was trained with scikit-learn 1.6.1
-# and pandas 2.2.3 - keep these versions so the pickle loads exactly as trained.
+# The model (models/AURA_model_bundle.joblib) was trained in Colab with
+# scikit-learn 1.6.1 and pandas 2.2.3 - keep these so the bundle loads exactly as trained.
 scikit-learn==1.6.1
 pandas>=2.2.3,<3
-numpy>=1.26,<3
+numpy>=2.0,<3
 joblib>=1.4
 openpyxl>=3.1
-# Exact SHAP explanations (TreeExplainer) - the notebook used shap 0.52.0
-shap>=0.46
+# The selected model is XGBoost. "xgboost-cpu" is the same library without the
+# ~300 MB GPU add-on (smaller, faster Render builds); the bundle loads with either.
+# Tip: in Colab run  import xgboost; print(xgboost.__version__)  and pin that version here.
+xgboost-cpu>=2.1
+# Exact SHAP explanations (TreeExplainer). Optional for XGBoost: without it the app
+# uses XGBoost's built-in TreeSHAP, which gives the same values with less memory.
+shap>=0.48
 SQLAlchemy>=2.0
 PyMySQL>=1.1
 psycopg2-binary>=2.9

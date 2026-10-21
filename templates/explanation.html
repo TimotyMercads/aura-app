@@ -70,9 +70,11 @@
     <details class="graph-box mt-20">
         <summary style="cursor:pointer; font-weight:600;">Technical detail for advisers (SHAP values)</summary>
         <p class="text-muted mt-20 mb-10">
-            Method: {{ explanation.method }}. Values are each factor's contribution to the predicted
-            probability of <strong>{{ explanation.predicted_label }}</strong>, starting from a baseline of
-            {{ explanation.base_value }}. One-hot columns (program, K-Means group) are summed into one factor.
+            Method: {{ explanation.method }}. Values are each factor's contribution to the model's score for
+            <strong>{{ explanation.predicted_label }}</strong>
+            ({{ "log-odds units" if explanation.units == "log-odds" else "probability units" }}), starting from a baseline of
+            {{ explanation.base_value }}; positive values push toward {{ explanation.predicted_label }}.
+            The three program columns (one-hot) are summed into one factor.
         </p>
         <table class="tech-table">
             <thead>
@@ -95,7 +97,7 @@
         <h3 class="mb-20">No live explanation available yet</h3>
         <p>
             A per-student explanation needs the trained model
-            (<code>models/AURA_model_bundle.pkl</code> and <code>aura_transformers.py</code>).
+            (<code>models/AURA_model_bundle.joblib</code> and <code>aura_transformers.py</code>).
             Once it's loaded, this page will explain — in plain language, safe to share with
             parents — the top factors behind this student's prediction.
         </p>

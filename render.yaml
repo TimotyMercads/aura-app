@@ -17,8 +17,8 @@ services:
         sync: false
       - key: SECRET_KEY
         generateValue: true
-      # If the service ever restarts with "out of memory", set this to 1 (explanations
-      # then use the lighter tree-path method instead of the SHAP library):
+      # If the service ever restarts with "out of memory", set this to 1. Explanations
+      # then use XGBoost's built-in TreeSHAP (same exact values, no shap library loaded):
       # - key: AURA_DISABLE_SHAP
       #   value: "1"
       # scikit-learn 1.6.1 (the model's training version) supports Python 3.9-3.13

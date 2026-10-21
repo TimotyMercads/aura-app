@@ -26,7 +26,7 @@
             {% endfor %}
         </select>
 
-        <input type="number" name="min_avg" value="{{ min_avg or '' }}" placeholder="Min GWA" min="0" max="100" step="0.01">
+        <input type="number" name="min_avg" value="{{ min_avg or '' }}" placeholder="Min 1st-Sem GWA" min="0" max="100" step="0.01">
 
         <select name="status">
             <option value="">All Statuses</option>
@@ -44,9 +44,9 @@
         {% endif %}
     </form>
     <p class="text-muted mt-20">
-        Status is the AI model's classification (At-Risk / Stable / High-Performing). The dataset
-        has no "Section" column, so filtering is by Program instead. GWA = annual GWA (or the
-        1st-semester GWA when the annual one isn't available).
+        Status is the AI model's classification (At-Risk / Stable / High-Performing), predicted from
+        the 1st-semester GWA, program and year level. Filtering is by Program (the dataset has no
+        "Section" column).
     </p>
 </div>
 
@@ -58,7 +58,7 @@
                 <th>Student ID</th>
                 <th>Program</th>
                 <th>Year</th>
-                <th>GWA</th>
+                <th>1st-Sem GWA</th>
                 <th>Status</th>
                 <th>Actions</th>
             </tr>

@@ -1918,3 +1918,20 @@ tbody tr:hover{
     .welcome-banner h1{ font-size:21px; }
     .edit-grid{ grid-template-columns:1fr; }
 }
+
+/* ---------- Panel revision: column guide + model card tables ---------- */
+.table-scroll-x{ width:100%; overflow-x:auto; }
+.columns-table{ width:100%; border-collapse:collapse; font-size:13px; }
+.columns-table th,
+.columns-table td{ padding:9px 12px; text-align:left; border-bottom:1px solid rgba(255,255,255,.07); vertical-align:top; }
+.columns-table th{ color:var(--text-muted); font-weight:600; font-size:12px; text-transform:uppercase; letter-spacing:.03em; }
+.columns-table tr.row-selected td{ background:rgba(212,167,61,.08); }
+.columns-table .badge{ font-size:10.5px; padding:2px 8px; }
+.model-metric em{ display:block; font-style:normal; font-size:11.5px; color:var(--text-muted); margin-top:2px; font-family:'IBM Plex Mono',monospace; }
+.gwa-scale{ position:relative; height:10px; border-radius:6px; margin:10px 0 6px;
+    background:linear-gradient(90deg, var(--maroon-soft) 0%, var(--maroon-soft) 28%, var(--harbor) 28%, var(--harbor) 60%, var(--sage-soft) 60%, var(--sage-soft) 100%); }
+.gwa-scale-marker{ position:absolute; top:-5px; width:4px; height:20px; border-radius:2px; background:var(--gold-soft); box-shadow:0 0 0 2px var(--ink-navy); transform:translateX(-50%); }
+.gwa-scale-labels{ position:relative; height:16px; font-size:11px; color:var(--text-muted); }
+.gwa-scale-labels span{ position:absolute; top:0; transform:translateX(-50%); }
+.gwa-scale-labels span:first-child{ transform:none; }
+.gwa-scale-labels span:last-child{ transform:translateX(-100%); }

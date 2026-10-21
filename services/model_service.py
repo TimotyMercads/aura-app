@@ -1,26 +1,33 @@
 """
 model_service.py
 -----------------
-Loads the deployable AURA model produced by the Dataset_Training notebook
-("Deployable Model" / "Export .pkl files" cells):
+Loads the deployable AURA model produced by the AURA-Final-Model-Training
+notebook ("Deployable Model" cell):
 
-    models/AURA_model_bundle.pkl   -> dict with the fitted pipeline + metadata
-    aura_transformers.py           -> the notebook's custom transformer classes
-                                      (FeatureBuilder, CorrelationFilter,
-                                      ClusterFeatureAdder, ...). The pickle only
-                                      stores a REFERENCE to these classes, so the
-                                      file must be importable (it sits next to
-                                      app.py).
+    models/AURA_model_bundle.joblib  -> dict with the fitted pipeline + metadata
+                                        (.pkl with the same name also accepted)
+    aura_transformers.py             -> the notebook's custom transformer classes
+                                        (FeatureBuilder, CorrelationFilter,
+                                        NameCleaner, ...). The bundle only stores
+                                        a REFERENCE to these classes, so the file
+                                        must be importable (it sits next to app.py).
+    models/AURA_model_report.json    -> OPTIONAL: repeated-CV, rule-baseline and
+                                        ablation results from the same notebook,
+                                        shown on the Model Card.
 
-Selected model (chosen by the notebook, manuscript 3.3.2 Step 4):
-    KMeans + Random Forest - statistically tied with the best repeated-CV
-    macro-F1, the highest At-Risk recall among the tied models, and explained
-    EXACTLY by SHAP's TreeExplainer.
+Selected model (panel-revised notebook, manuscript 3.3.2 Step 4):
+    XGBoost - statistically tied with the best repeated-CV macro-F1 (the
+    RF+XGBoost hybrid) and, unlike the hybrid, explained EXACTLY by TreeSHAP.
+    K-Means and "total scheduled classes" were removed after the panel review
+    (the ablation showed no significant effect), so the model uses only:
+    1st-semester GWA, year level and program.
 
-The bundle's pipeline is self-contained: it takes RAW dataset rows (the same
-columns as the AURA dataset sheet) and does all feature building, imputation,
-one-hot encoding, K-Means cluster assignment and classification itself. So
-there are no separate scaler / encoder files anymore.
+The bundle's pipeline is self-contained: it takes RAW rows and does feature
+building, imputation, one-hot encoding and classification itself.
+
+Explanations: SHAP TreeExplainer when the shap library is installed;
+otherwise XGBoost's built-in TreeSHAP (pred_contribs) - the same exact
+algorithm, without loading the shap library. Both are in log-odds units.
 
 Everything here degrades gracefully: if the bundle is missing or cannot be
 loaded, is_ready() is False and the pages fall back to a "demo mode" banner.
@@ -46,7 +53,10 @@ MODEL_DIR = os.path.join(BASE_DIR, "models")
 if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
 
-BUNDLE_FILE = "AURA_model_bundle.pkl"
+# The notebook exports .joblib; a .pkl of the same bundle is accepted too.
+BUNDLE_FILES = ["AURA_model_bundle.joblib", "AURA_model_bundle.pkl"]
+BUNDLE_FILE = BUNDLE_FILES[0]
+REPORT_FILE = "AURA_model_report.json"
 TRANSFORMERS_FILE = "aura_transformers.py"
 
 CLASS_ORDER_DEFAULT = ["At-Risk", "Stable", "High-Performing"]
@@ -61,7 +71,16 @@ _cache = {}
 # --------------------------------------------------------------------------
 
 def _bundle_path():
+    """First bundle file that exists (joblib preferred), else the default name."""
+    for name in BUNDLE_FILES:
+        path = os.path.join(MODEL_DIR, name)
+        if os.path.exists(path):
+            return path
     return os.path.join(MODEL_DIR, BUNDLE_FILE)
+
+
+def bundle_filename():
+    return os.path.basename(_bundle_path())
 
 
 def _transformers_path():
@@ -140,8 +159,9 @@ def shap_available() -> bool:
     True if the shap library is installed. Uses find_spec so it does NOT import
     shap (which pulls in numba/llvmlite and ~150+ MB of RAM) on every page load -
     the real import happens only when an explanation is first generated.
-    Set the env var AURA_DISABLE_SHAP=1 to force the lighter tree-path fallback
-    (useful on small hosts, e.g. a 512 MB free tier, if the app runs out of memory).
+    Set the env var AURA_DISABLE_SHAP=1 to skip the shap library (useful on
+    small hosts, e.g. a 512 MB free tier). For the XGBoost model nothing is
+    lost: XGBoost's built-in TreeSHAP gives the same exact values.
     """
     if os.environ.get("AURA_DISABLE_SHAP", "").strip().lower() in ("1", "true", "yes"):
         return False
@@ -156,9 +176,42 @@ def file_status():
     """Presence of the files the app needs, for the Upload page."""
     return {
         "bundle": os.path.exists(_bundle_path()),
+        "bundle_name": bundle_filename(),
+        "old_pkl_also_present": all(os.path.exists(os.path.join(MODEL_DIR, n)) for n in BUNDLE_FILES),
         "transformers": os.path.exists(_transformers_path()),
+        "report": os.path.exists(os.path.join(MODEL_DIR, REPORT_FILE)),
         "shap": shap_available(),
+        "xgboost": _xgboost_installed(),
     }
+
+
+def _xgboost_installed():
+    import importlib.util
+    try:
+        return importlib.util.find_spec("xgboost") is not None
+    except Exception:
+        return False
+
+
+def _is_xgboost(clf):
+    return type(clf).__name__ in ("XGBClassifier", "XGBRegressor") or hasattr(clf, "get_booster")
+
+
+def model_report():
+    """Extra notebook results for the Model Card (models/AURA_model_report.json)."""
+    if "report" in _cache:
+        return _cache["report"]
+    path = os.path.join(MODEL_DIR, REPORT_FILE)
+    report = None
+    if os.path.exists(path):
+        try:
+            import json
+            with open(path, encoding="utf-8") as fh:
+                report = json.load(fh)
+        except Exception:
+            report = None
+    _cache["report"] = report
+    return report
 
 
 def _pipeline():
@@ -203,7 +256,7 @@ def required_input_columns():
             raw.add("program")
         else:
             raw.add(f)
-    order = ["program", "year_level", "first_sem_gwa", "total_classes"]
+    order = ["program", "year_level", "first_sem_gwa"]
     return [c for c in order if c in raw] + sorted(raw - set(order))
 
 
@@ -226,8 +279,19 @@ def model_info():
         "trained_sklearn": trained_with.get("sklearn"),
         "installed_sklearn": sklearn.__version__,
         "version_mismatch": bool(trained_with.get("sklearn")) and trained_with.get("sklearn") != sklearn.__version__,
-        "explainer": "SHAP TreeExplainer (exact)" if shap_available() else "Tree path attribution (SHAP library not installed)",
+        "explainer": explainer_name(),
+        "bundle_file": bundle_filename(),
+        "report": model_report(),
     }
+
+
+def explainer_name():
+    clf = _pipeline()[-1] if _pipeline() is not None else None
+    if shap_available():
+        return "SHAP TreeExplainer (exact)"
+    if clf is not None and _is_xgboost(clf):
+        return "TreeSHAP built into XGBoost (exact - same values as SHAP TreeExplainer)"
+    return "Tree path attribution (SHAP library not installed)"
 
 
 # --------------------------------------------------------------------------
@@ -367,6 +431,28 @@ def _tree_path_attribution(clf, X):
     return contrib / k, base / k
 
 
+def _xgboost_contribs(clf, Xt: pd.DataFrame, n_classes):
+    """
+    XGBoost's built-in TreeSHAP (Booster.predict(pred_contribs=True)): the same
+    exact, path-dependent TreeSHAP that shap.TreeExplainer computes for XGBoost,
+    in log-odds (margin) units. Returns (n, features, classes) + base values.
+    """
+    import xgboost as xgb
+    booster = clf.get_booster()
+    names = booster.feature_names or list(Xt.columns)
+    dm = xgb.DMatrix(Xt[names].astype(float), feature_names=names)
+    raw = np.asarray(booster.predict(dm, pred_contribs=True))
+    n, f = len(Xt), len(names)
+    if raw.ndim == 2:                       # binary model: (n, f + 1)
+        raw = raw[:, None, :]
+    contrib = np.transpose(raw[:, :, :f], (0, 2, 1))          # (n, f, classes)
+    base = raw[0, :, f]
+    if list(names) != list(Xt.columns):     # back to Xt's column order
+        idx = [names.index(col) for col in Xt.columns]
+        contrib = contrib[:, idx, :]
+    return contrib, base
+
+
 def _shap_3d(Xt: pd.DataFrame):
     """(n, features, classes) attributions + expected values + method name."""
     clf = _pipeline()[-1]
@@ -383,6 +469,9 @@ def _shap_3d(Xt: pd.DataFrame):
             return _to_3d(sv, n, f, c), ev, "SHAP TreeExplainer"
         except Exception:
             pass
+    if _is_xgboost(clf):
+        contrib, base = _xgboost_contribs(clf, Xt, c)
+        return contrib, base, "TreeSHAP, built into XGBoost"
     contrib, base = _tree_path_attribution(clf, Xt)
     return contrib, base, "Tree path attribution"
 
@@ -415,7 +504,7 @@ def explain_student(row: pd.Series, top_n=6):
     Returns:
       {
         "predicted_label": "At-Risk" | "Stable" | "High-Performing",
-        "method": "SHAP TreeExplainer" | "Tree path attribution",
+        "method": "SHAP TreeExplainer" | "TreeSHAP, built into XGBoost" | ...,
         "groups": {"Academic Performance": pct, ...},      # Key Factors bars
         "top_features": [ {feature, label, raw_value, plain{...}}, ... ],
         "technical": [ {feature, label, value, shap, effect}, ... ],
@@ -444,7 +533,7 @@ def explain_student(row: pd.Series, top_n=6):
     group_scores = {}
     for j, feat in enumerate(features):
         g = plain_language.factor_group(_factor_key(feat))
-        group_scores[g] = group_scores.get(g, 0.0) + abs(sv[j, c])
+        group_scores[g] = group_scores.get(g, 0.0) + float(abs(sv[j, c]))
     top_score = max(group_scores.values()) if group_scores else 0
     groups = {
         g: (max(round(s / top_score * 100, 1), 4) if top_score > 0 else 4)
@@ -493,6 +582,9 @@ def explain_student(row: pd.Series, top_n=6):
         "top_features": top_features,
         "technical": technical,
         "base_value": round(float(ev[c] if len(ev) > c else ev[0]), 4),
+        # XGBoost's TreeSHAP values are in log-odds (margin) units; the
+        # random-forest path attribution is in probability units.
+        "units": "log-odds" if _is_xgboost(_pipeline()[-1]) else "probability",
     }
 
 

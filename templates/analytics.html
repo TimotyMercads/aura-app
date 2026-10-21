@@ -7,12 +7,12 @@
 
 <div class="cards">
     <div class="card">
-        <h4>📊 Average GWA</h4>
+        <h4>📊 Average 1st-Sem GWA</h4>
         <h2>{{ "%.2f"|format(charts.avg_grade) if charts and charts.avg_grade is not none else "—" }}</h2>
     </div>
     <div class="card green">
-        <h4>🗓️ Attendance Rate</h4>
-        <h2>{{ charts.avg_attendance if charts and charts.avg_attendance is not none else "—" }}{{ "%" if charts and charts.avg_attendance is not none }}</h2>
+        <h4>🎯 Avg. At-Risk Probability</h4>
+        <h2>{{ charts.avg_prob_at_risk if charts and charts.avg_prob_at_risk is not none else "—" }}{{ "%" if charts and charts.avg_prob_at_risk is not none }}</h2>
     </div>
     <div class="card red">
         <h4>⚠️ Students At-Risk</h4>
@@ -46,12 +46,11 @@
 
 <div class="charts-grid-2 mb-20">
     <div class="graph-box">
-        <h3>Attendance by Year Level</h3>
-        {% if charts and charts.attendance_by_year %}
+        <h3>Classification by Year Level</h3>
+        {% if charts and charts.class_by_year and charts.class_by_year._years %}
             <div class="chart-wrap chart-wrap-sm">
-                <canvas id="attendanceByYear"></canvas>
+                <canvas id="classByYear"></canvas>
             </div>
-            <p class="text-muted mt-20" style="font-size:12px;">Attendance values in the AY 2025-2026 dataset are simulated (see its Data_Dictionary) and are not used by the model.</p>
         {% else %}
             <div class="chart-placeholder">Upload a dataset to see this chart</div>
         {% endif %}
@@ -72,7 +71,7 @@
 {% if top_features %}
 <div class="graph-box mb-20">
     <h3>Top Predictors (from trained model)</h3>
-    <p class="text-muted mb-10">Mean absolute SHAP value across your students (all classes) — how strongly each factor moves the prediction on average.</p>
+    <p class="text-muted mb-10">Mean absolute SHAP value across your students (all classes, log-odds units) — how strongly each of the model's three inputs moves the prediction on average.</p>
     <div class="chart-wrap chart-wrap-sm">
         <canvas id="topFeatures"></canvas>
     </div>
@@ -80,13 +79,19 @@
 {% endif %}
 
 {% if model_info %}
+{% set r = model_info.report %}
 <div class="graph-box">
     <h3>Model Card</h3>
     <p class="text-muted">
-        Selected model: <strong>{{ model_info.selected_model }}</strong> · classes:
+        Selected model: <strong>{{ model_info.selected_model }}</strong> · inputs:
+        <strong>{{ model_info.friendly_features | unique | join(", ") }}</strong> · classes:
         {{ model_info.class_order | join(" / ") }} · explanations: {{ model_info.explainer }}.
-        Scores below are from the held-out 30% <strong>test set</strong> in the training notebook
-        (evaluated once, before the deployed model was refit on all data).
+    </p>
+
+    <h4 class="mt-20">Held-out test set{% if r %} ({{ r.dataset.test_students }} students){% endif %}</h4>
+    <p class="text-muted" style="font-size:12.5px;">
+        Evaluated once in the training notebook, before the deployed model was refit on all
+        {% if r %}{{ r.dataset.students }}{% endif %} students.
     </p>
     {% set m = model_info.test_metrics %}
     <div class="model-metrics">
@@ -96,10 +101,76 @@
             {% endif %}
         {% endfor %}
     </div>
-    <p class="text-muted mt-20" style="font-size:12px;">
-        The test set contained only 4 At-Risk students, so At-Risk recall/precision there are very
-        uncertain. Treat At-Risk flags as prompts for a closer look, not conclusions.
+    <p class="text-muted mt-10" style="font-size:12px;">
+        The test set contained only {{ r.dataset.test_at_risk if r else "a few" }} At-Risk students, so one student
+        changes At-Risk recall by {{ (100 / r.dataset.test_at_risk) | round | int if r and r.dataset.test_at_risk else "many" }} points.
+        The cross-validated figures below are the steadier estimate.
     </p>
+
+    {% if r and r.repeated_cv_all and r.repeated_cv_all.get(model_info.selected_model) %}
+    {% set cv = r.repeated_cv_all[model_info.selected_model] %}
+    <h4 class="mt-30">Repeated cross-validation — {{ r.cv_scheme }}</h4>
+    <div class="model-metrics">
+        {% for key in ["F1 (macro)", "MCC", "Accuracy", "At-Risk Recall", "At-Risk Precision"] %}
+            {% if cv.get(key) %}
+            <div class="model-metric"><span>{{ key }}</span><strong>{{ "%.3f"|format(cv[key][0]) }}</strong><em>± {{ "%.3f"|format(cv[key][1]) }}</em></div>
+            {% endif %}
+        {% endfor %}
+    </div>
+
+    <h4 class="mt-30">Compared with the other models and the rule-based baseline</h4>
+    <p class="text-muted" style="font-size:12.5px;">
+        Same {{ r.cv_scheme }}. The rule baseline applies the label cut-offs (82 / 90) directly to the 1st-semester GWA, with no learning.
+    </p>
+    <div class="table-scroll-x">
+    <table class="columns-table">
+        <thead><tr><th>Model</th><th>Macro-F1</th><th>At-Risk Recall</th><th>At-Risk Precision</th><th>Accuracy</th></tr></thead>
+        <tbody>
+        {% for name, row in r.repeated_cv_all.items() | sort(attribute="1.F1 (macro).0", reverse=True) %}
+            <tr class="{{ 'row-selected' if name == model_info.selected_model }}">
+                <td>{{ name }}{% if name == model_info.selected_model %} <span class="badge badge-success">selected</span>{% elif name == r.rule_name %} <span class="badge badge-info">baseline</span>{% endif %}</td>
+                <td>{{ "%.3f"|format(row["F1 (macro)"][0]) }}</td>
+                <td>{{ "%.3f"|format(row["At-Risk Recall"][0]) }}</td>
+                <td>{{ "%.3f"|format(row["At-Risk Precision"][0]) }}</td>
+                <td>{{ "%.3f"|format(row["Accuracy"][0]) }}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    </div>
+    {% if r.vs_rule %}
+    {% set f = r.vs_rule["F1 (macro)"] %}{% set rr = r.vs_rule["At-Risk Recall"] %}
+    <p class="text-muted mt-10" style="font-size:12.5px;">
+        {{ model_info.selected_model }} vs the rule (corrected paired t-test): macro-F1 {{ "%+.3f"|format(f["difference vs rule"]) }}
+        (95% CI {{ "%.3f"|format(f["95% CI low"]) }} to {{ "%.3f"|format(f["95% CI high"]) }}, p = {{ "%.2f"|format(f.p) }}),
+        At-Risk recall {{ "%+.3f"|format(rr["difference vs rule"]) }} (p = {{ "%.2f"|format(rr.p) }}) — {{ f.verdict }}.
+        With 12 At-Risk students no model separates itself statistically from the rule; the model is selected among the
+        experimental candidates (manuscript 3.3.2) for being tied with the best macro-F1 while being exactly explainable, and it adds
+        class probabilities and per-student explanations that a fixed cut-off cannot give.
+    </p>
+    {% endif %}
+
+    <h4 class="mt-30">What the model does not use</h4>
+    <ul class="model-file-list">
+        {% if r.excluded.panel_revision %}
+        <li>Removed after the panel review: <strong>{{ r.excluded.panel_revision | join(", ") | replace("total_classes", "total scheduled classes") }}</strong>
+            — re-adding them had no significant effect
+            {% for a in r.ablation if "total scheduled" in a.variant and a.metric == "F1 (macro)" %}{% if loop.first %}(total classes: macro-F1 {{ "%+.3f"|format(a.difference) }}, p = {{ "%.2f"|format(a.p) }}; K-Means k = 2–4: no meaningful change){% endif %}{% endfor %}.</li>
+        {% endif %}
+        {% if r.excluded.label_leakage %}
+        <li>Not used to avoid label leakage: <strong>annual GWA and 2nd-semester GWA</strong> — the label is computed from them ({{ r.dataset.label_rule }}).</li>
+        {% endif %}
+        {% if r.excluded.simulated %}
+        <li>Not used because no institutional source exists: <strong>attendance, assignment and LMS columns</strong> (simulated in the dataset).</li>
+        {% endif %}
+    </ul>
+    {% else %}
+    <p class="text-muted mt-20" style="font-size:12px;">
+        Add <code>models/AURA_model_report.json</code> (exported by the notebook) to also show the repeated
+        cross-validation and rule-baseline comparison here.
+    </p>
+    {% endif %}
+    <p class="text-muted mt-20" style="font-size:12px;">Treat At-Risk flags as prompts for a closer look, not conclusions.</p>
 </div>
 {% endif %}
 
@@ -134,25 +205,23 @@ new Chart(document.getElementById('perfDist'), {
 });
 {% endif %}
 
-{% if charts.attendance_by_year %}
-new Chart(document.getElementById('attendanceByYear'), {
+{% if charts.class_by_year and charts.class_by_year._years %}
+new Chart(document.getElementById('classByYear'), {
     type: 'bar',
     data: {
-        labels: {{ charts.attendance_by_year.keys() | list | tojson }},
-        datasets: [{
-            label: 'Attendance Rate (%)',
-            data: {{ charts.attendance_by_year.values() | list | tojson }},
-            backgroundColor: '#3E6FA8',
-            borderRadius: 6,
-            maxBarThickness: 46
-        }]
+        labels: {{ charts.class_by_year._years | tojson }},
+        datasets: [
+            { label: 'At-Risk', data: {{ charts.class_by_year['At-Risk'] | tojson }}, backgroundColor: '#9C3A56', borderRadius: 4 },
+            { label: 'Stable', data: {{ charts.class_by_year['Stable'] | tojson }}, backgroundColor: '#3E6FA8', borderRadius: 4 },
+            { label: 'High-Performing', data: {{ charts.class_by_year['High-Performing'] | tojson }}, backgroundColor: '#57B27F', borderRadius: 4 }
+        ]
     },
     options: {
         maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
+        plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 14 } } },
         scales: {
-            y: { grid: { color: 'rgba(255,255,255,.06)' } },
-            x: { grid: { display: false } }
+            x: { stacked: true, grid: { display: false } },
+            y: { stacked: true, grid: { color: 'rgba(255,255,255,.06)' } }
         }
     }
 });

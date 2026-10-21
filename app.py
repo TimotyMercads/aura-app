@@ -17,11 +17,16 @@ Multi-tenancy: every teacher only ever sees/edits the students from
 datasets THEY uploaded - see data_service.py for how this is enforced
 at the query level, not just in these routes.
 
-Predictions come from ONE file produced by the Dataset_Training notebook:
-    models/AURA_model_bundle.pkl   (selected model: KMeans + Random Forest)
+Predictions come from ONE file produced by the AURA-Final-Model-Training
+notebook:
+    models/AURA_model_bundle.joblib   (selected model: XGBoost)
 plus aura_transformers.py next to this file (the notebook's custom pipeline
-classes, needed to unpickle the bundle). Explanations use SHAP's
-TreeExplainer (manuscript 3.3.2 Step 5).
+classes, needed to unpickle the bundle). Explanations use exact TreeSHAP
+(manuscript 3.3.2 Step 5).
+
+PANEL REVISION (ODRF): uploads only need the columns the model actually
+uses - student_id, program, year_level, first_sem_gwa (+ optional
+target_class). See utils/cleaning.py.
 """
 
 import os
@@ -36,7 +41,7 @@ from sqlalchemy.exc import OperationalError
 
 from services import data_service, model_service, auth_service, intervention_service, action_plan_service
 from utils import intervention_policy, plain_language
-from utils.cleaning import total_changes, CRITICAL_COLUMNS, SCHEMA_COLUMNS
+from utils.cleaning import total_changes, REQUIRED_COLUMNS, OPTIONAL_COLUMNS, KNOWN_PROGRAMS
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-change-me")
@@ -430,9 +435,27 @@ def upload():
         model_info=model_service.model_info(),
         model_error=model_service.load_error(),
         clean_report=clean_report,
-        required_columns=["student_id"] + CRITICAL_COLUMNS,
-        schema_columns=SCHEMA_COLUMNS,
+        required_columns=REQUIRED_COLUMNS,
+        optional_columns=OPTIONAL_COLUMNS,
+        known_programs=KNOWN_PROGRAMS,
         **_common_context("upload"),
+    )
+
+
+@app.route("/download/template")
+@login_required
+def download_template():
+    """A ready-to-fill CSV with exactly the columns an upload needs."""
+    sample = (
+        "student_id,program,year_level,first_sem_gwa,target_class\n"
+        "AUF-2526-0001,BSCS,1,88.75,\n"
+        "AUF-2526-0002,BSIT,2,81.40,\n"
+        "AUF-2526-0003,BMMA,3,93.10,\n"
+    )
+    buffer = io.BytesIO(sample.encode("utf-8"))
+    return send_file(
+        buffer, mimetype="text/csv", as_attachment=True,
+        download_name="aura_upload_template.csv",
     )
 
 
@@ -577,15 +600,15 @@ def action_plan_delete(item_id):
 @app.route("/reload-model", methods=["POST"])
 @login_required
 def reload_model():
-    """After copying a new AURA_model_bundle.pkl into /models, this reloads it
-    without a restart and re-classifies this teacher's students."""
+    """After copying a new AURA_model_bundle.joblib into /models, this reloads
+    it without a restart and re-classifies this teacher's students."""
     model_service.reload_all()
     teacher_id = int(current_user.id)
     if model_service.is_ready():
         n = data_service.refresh_predictions(teacher_id, _predict_fn())
-        flash(f"Model reloaded — {n:,} student(s) re-classified with the current AURA_model_bundle.pkl.", "success")
+        flash(f"Model reloaded — {n:,} student(s) re-classified with {model_service.bundle_filename()}.", "success")
     else:
-        flash("Model reloaded, but AURA_model_bundle.pkl could not be loaded — see Model Files below.", "error")
+        flash("Model reloaded, but the model bundle could not be loaded — see Model Files below.", "error")
     return redirect(url_for("upload"))
 
 

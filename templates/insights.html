@@ -12,10 +12,10 @@
         <div class="text-muted">{{ student.program }} · Year {{ student.year_level }}</div>
     </div>
     <div class="stats">
-        <span class="stat-item">GWA: <strong>{{ "%.2f"|format(student.gwa) if student.gwa is not none else "—" }}</strong></span>
         <span class="stat-item">1st-Sem GWA: <strong>{{ "%.2f"|format(student.first_sem_gwa) if student.first_sem_gwa is not none else "—" }}</strong></span>
-        <span class="stat-item">Attendance: <strong>{{ student.attendance if student.attendance is not none else "—" }}{{ "%" if student.attendance is not none }}</strong></span>
-        <span class="stat-item">LMS Activity: <strong>{{ student.lms_activity }}</strong></span>
+        <span class="stat-item">Program: <strong>{{ student.program }}</strong></span>
+        <span class="stat-item">Year Level: <strong>{{ student.year_level }}</strong></span>
+        <span class="stat-item">At-Risk Probability: <strong>{{ student.prob_at_risk if student.prob_at_risk is not none else "—" }}{{ "%" if student.prob_at_risk is not none }}</strong></span>
     </div>
     <a href="{{ url_for('student_edit', student_id=student.id) }}" class="btn-pill btn-pill-secondary">✏️ Edit</a>
     <a href="{{ url_for('student_explanation', student_id=student.id) }}" class="btn-pill">Explanation</a>
@@ -60,7 +60,7 @@
 <div class="insight-card">
     <h3 class="mb-20">Key Factors</h3>
     {% if explanation %}
-        <p class="text-muted mb-20">How much each group of factors influenced this prediction ({{ explanation.method }}).</p>
+        <p class="text-muted mb-20">How much each of the model's three inputs influenced this prediction ({{ explanation.method }}).</p>
         {% set bar_colors = ["red", "yellow", "purple", "green"] %}
         {% for group, pct in explanation.groups.items() %}
         <div class="progress-item">
@@ -72,27 +72,17 @@
         {% endfor %}
     {% else %}
         <p class="text-muted">
-            Key factor weighting needs the trained model (<code>models/AURA_model_bundle.pkl</code>).
-            Showing the student's raw values instead.
+            Key factor weighting needs the trained model (<code>models/AURA_model_bundle.joblib</code>).
         </p>
-        <div class="progress-item">
-            <label>🔴 GWA</label>
-            <div class="progress-bar">
-                <div class="progress red" style="width:{{ student.gwa if student.gwa is not none else 50 }}%;"></div>
-            </div>
-        </div>
-        <div class="progress-item">
-            <label>🟡 Attendance</label>
-            <div class="progress-bar">
-                <div class="progress yellow" style="width:{{ student.attendance if student.attendance is not none else 50 }}%;"></div>
-            </div>
-        </div>
-        <div class="progress-item">
-            <label>🟣 LMS Engagement</label>
-            <div class="progress-bar">
-                <div class="progress purple" style="width:{{ 60 if student.lms_activity == 'High' else (35 if student.lms_activity == 'Medium' else 15) }}%;"></div>
-            </div>
-        </div>
+    {% endif %}
+    {% if student.first_sem_gwa is not none %}
+    {% set pos = ((student.first_sem_gwa - 75) / 25 * 100) %}
+    <div class="mt-20">
+        <label class="text-muted" style="font-size:12.5px;">Where the 1st-semester GWA ({{ "%.2f"|format(student.first_sem_gwa) }}) sits — {{ student.gwa_band }}</label>
+        <div class="gwa-scale"><div class="gwa-scale-marker" style="left:{{ [[pos, 0]|max, 100]|min }}%;"></div></div>
+        <div class="gwa-scale-labels"><span style="left:0;">75</span><span style="left:28%;">82</span><span style="left:60%;">90</span><span style="left:100%;">100</span></div>
+        <p class="text-muted mt-10" style="font-size:11.5px;">The 82 / 90 cut-offs define the classes for the whole year; the model uses the first-semester grade to predict them early.</p>
+    </div>
     {% endif %}
 </div>
 
@@ -121,7 +111,7 @@
         <li>✅ {{ step.title }} — {{ step.detail }}</li>
         {% endfor %}
     </ul>
-    <p class="policy-note">Based on AUF's Early Intervention and Academic Support Policy. The stage is estimated from the semester GWAs.</p>
+    <p class="policy-note">Based on AUF's Early Intervention and Academic Support Policy. The stage is estimated from the 1st-semester GWA.</p>
     {% elif general_suggestions %}
     <ul class="model-file-list">
         {% for sgt in general_suggestions[:3] %}

@@ -124,12 +124,14 @@ entirely, since it isn't a serverless platform.
 
 ## 5. Adding your trained model files
 
-`models/AURA_model_bundle.pkl` and `aura_transformers.py` need to be
-**committed to the GitHub repository** so Render/Vercel deploys them along
-with the code. `.gitignore` already allows `AURA_model_bundle.pkl` (other
-`.pkl` files in `/models` stay ignored). `requirements.txt` pins
-`scikit-learn==1.6.1`, the version the model was trained with, and
-`render.yaml` sets Python 3.11.
+`models/AURA_model_bundle.joblib`, `models/AURA_model_report.json` and
+`aura_transformers.py` need to be **committed to the GitHub repository** so
+Render/Vercel deploys them along with the code (delete the old
+`models/AURA_model_bundle.pkl`). `requirements.txt` pins
+`scikit-learn==1.6.1`, the version the model was trained with, and installs
+`xgboost-cpu`; `render.yaml` sets Python 3.11. If Render runs out of memory,
+add the environment variable `AURA_DISABLE_SHAP=1` - explanations then use
+XGBoost's built-in TreeSHAP, which gives the same values.
 
 ---
 

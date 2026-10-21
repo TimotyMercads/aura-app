@@ -3,26 +3,21 @@ data_service.py
 ----------------
 Everything related to loading, storing, and reading the student dataset.
 
-The expected schema is the AURA AY 2025-2026 dataset (sheet "dataset" of
-the Final-AURA_Dataset workbook; see its Data_Dictionary sheet):
+PANEL REVISION (ODRF): an upload only needs the columns that actually feed
+the prediction. The final model (XGBoost, AURA-Final-Model-Training
+notebook) uses three inputs, so the expected file is:
 
-    student_id, academic_year, semester, program, year_level, gwa,
-    first_sem_gwa, assignment_average, second_sem_gwa, total_classes,
-    classes_attended, absences, attendance_rate, absenteeism_rate,
-    lms_login_count, lms_resource_views, lms_assignment_submissions,
-    on_time_submissions, late_submissions, lms_activity_count,
-    avg_weekly_lms_logins, avg_daily_activity, first_activity_date,
-    last_activity_date, target_class (optional: At-Risk / Stable /
-    High-Performing)
+    student_id      required - identifies the student (not a model input)
+    program         required - BSCS / BSIT / BMMA
+    year_level      required - 1, 2, 3 ...
+    first_sem_gwa   required - 1st-semester GWA (AUF percentage scale)
+    target_class    OPTIONAL - recorded class (At-Risk / Stable /
+                    High-Performing), only shown next to the prediction
 
-target_class is OPTIONAL - the system's purpose is to classify UNLABELED
-students, so every upload is run through the selected model and its
-prediction (predicted_class) is the status shown across the app. When a
-file does carry target_class, it is shown alongside as the "recorded"
-class (computed by the registrar-GWA rule: At-Risk <= 82,
-High-Performing >= 90).
-
-No demographic variables are stored (study scope).
+Any other column in the file (annual / 2nd-sem GWA, attendance, LMS, total
+classes, demographics ...) is ignored and listed in the cleaning report.
+Every upload is run through the selected model and its prediction
+(predicted_class) is the status shown across the app.
 
 If no dataset has been uploaded yet, every function degrades gracefully
 and returns None / demo-friendly defaults so the UI never crashes.
@@ -70,16 +65,24 @@ class MissingRequiredColumn(Exception):
 
 _SQL_TYPES = {
     "student_id": "VARCHAR(50) NOT NULL",
-    "academic_year": "VARCHAR(20) NULL",
-    "semester": "VARCHAR(60) NULL",
     "program": "VARCHAR(20) NULL",
-    "first_activity_date": "DATE NULL",
-    "last_activity_date": "DATE NULL",
+    "year_level": "INT NULL",
+    "first_sem_gwa": "FLOAT NULL",
     "target_class": "VARCHAR(20) NULL",
     "predicted_class": "VARCHAR(20) NULL",
     "prediction_confidence": "FLOAT NULL",
     "prob_at_risk": "FLOAT NULL",
 }
+
+# Columns of the previous (full-schema) students table that the panel-revised
+# model no longer uses. If any of these exist, the table is migrated.
+LEGACY_STUDENT_COLUMNS = [
+    "academic_year", "semester", "gwa", "assignment_average", "second_sem_gwa",
+    "total_classes", "classes_attended", "absences", "attendance_rate", "absenteeism_rate",
+    "lms_login_count", "lms_resource_views", "lms_assignment_submissions",
+    "on_time_submissions", "late_submissions", "lms_activity_count",
+    "avg_weekly_lms_logins", "avg_daily_activity", "first_activity_date", "last_activity_date",
+]
 
 
 def _column_type(col):
@@ -105,36 +108,60 @@ def students_table_ddl(dialect):
 _schema_checked = False
 
 
+def _create_students_table(conn, dialect):
+    conn.execute(text(students_table_ddl(dialect)))
+    conn.execute(text("CREATE INDEX idx_student_id ON students (student_id)"))
+    conn.execute(text("CREATE INDEX idx_students_upload ON students (upload_id)"))
+
+
 def ensure_students_schema():
     """
-    The previous version of AURA stored a different (synthetic) schema in
-    `students` (Student_ID, Previous_GPA, Sex, ...). That data cannot be used
-    by the new model, so if the old table is detected it is dropped and
-    recreated with the current schema - automatically, once. Only the
-    students table is touched; users, upload history, intervention checklists
-    and action plans are kept.
+    Makes sure `students` has the current (panel-revised) columns -
+    automatically, once per process. Only the students table is touched;
+    users, upload history, intervention checklists and action plans are kept.
+
+      * no table                      -> create it
+      * the very old synthetic schema -> drop + recreate (that data can't be
+        (Student_ID, Previous_GPA ...)   used by the model; re-upload needed)
+      * the previous full AURA schema -> MIGRATE IN PLACE: keep student_id,
+        (attendance, LMS, total_classes,  program, year_level, first_sem_gwa,
+        annual GWA ... columns)           target_class and upload_id; drop the
+                                          rest. Predictions are cleared so the
+                                          new model re-classifies everyone on
+                                          the next page load.
     """
     global _schema_checked
     if _schema_checked:
         return
     engine = get_engine()
     insp = inspect(engine)
+    dialect = dialect_name()
+
     if not insp.has_table("students"):
-        recreate = True
-    else:
-        cols = {c["name"].lower() for c in insp.get_columns("students")}
-        recreate = not {"first_sem_gwa", "target_class", "predicted_class", "student_id"} <= cols \
-            or "previous_gpa" in cols
-    if recreate:
-        dialect = dialect_name()
         with engine.begin() as conn:
-            if insp.has_table("students"):
-                conn.execute(text("DROP TABLE students"))
-            conn.execute(text(students_table_ddl(dialect)))
-            conn.execute(text("CREATE INDEX idx_student_id ON students (student_id)"))
-            conn.execute(text("CREATE INDEX idx_students_upload ON students (upload_id)"))
-            # the old rows are gone, so no upload should still claim to be active
+            _create_students_table(conn, dialect)
+        _schema_checked = True
+        return
+
+    cols = {c["name"].lower() for c in insp.get_columns("students")}
+    core = {"student_id", "program", "year_level", "first_sem_gwa", "predicted_class"}
+
+    if not core <= cols or "previous_gpa" in cols:
+        # unusable old schema -> start over
+        with engine.begin() as conn:
+            conn.execute(text("DROP TABLE students"))
+            _create_students_table(conn, dialect)
             conn.execute(text("UPDATE uploads SET is_active = FALSE"))
+    elif cols & set(LEGACY_STUDENT_COLUMNS):
+        # previous full schema -> keep the rows, keep only the model's columns
+        keep = ["upload_id"] + [c for c in SCHEMA_COLUMNS if c in cols]
+        with engine.begin() as conn:
+            old = pd.read_sql(text(f"SELECT {', '.join(keep)} FROM students ORDER BY id"), conn)
+            conn.execute(text("DROP TABLE students"))
+            _create_students_table(conn, dialect)
+            if not old.empty:
+                old = old.astype(object).where(old.notna(), None)
+                old.to_sql("students", conn, if_exists="append", index=False)
     _schema_checked = True
 
 
@@ -212,7 +239,32 @@ def load_dataset(teacher_id, predict_fn=None):
         df.loc[missing, "predicted_class"] = res["labels"]
         df.loc[missing, "prediction_confidence"] = res["confidences"]
         df.loc[missing, "prob_at_risk"] = res["prob_at_risk"]
+        # save them, so they're computed once (e.g. right after a migration)
+        _store_predictions(teacher_id, df.loc[missing, ID_COLUMN], res)
     return _with_status(df)
+
+
+def _store_predictions(teacher_id, student_ids, res):
+    rows = [
+        {"label": l, "conf": c, "par": p, "sid": sid, "tid": teacher_id}
+        for l, c, p, sid in zip(res["labels"], res["confidences"], res["prob_at_risk"], student_ids)
+        if l is not None
+    ]
+    if not rows:
+        return 0
+    try:
+        with get_engine().begin() as conn:
+            conn.execute(
+                text(
+                    "UPDATE students SET predicted_class = :label, prediction_confidence = :conf, "
+                    "prob_at_risk = :par WHERE student_id = :sid "
+                    "AND upload_id IN (SELECT id FROM uploads WHERE uploaded_by = :tid)"
+                ),
+                rows,
+            )
+    except Exception:
+        return 0
+    return len(rows)
 
 
 def _read_upload(file_storage, filename, ext):
@@ -266,7 +318,8 @@ def save_dataset(file_storage, uploaded_by, predict_fn=None):
     if missing:
         raise MissingRequiredColumn(
             f'"{filename}" is missing required column(s): {", ".join(missing)}. '
-            f"The model needs these to classify each student — see the expected columns on this page."
+            f"The file needs student_id, program, year_level and first_sem_gwa — the only inputs "
+            f"the model uses. Download the template on this page to see the exact format."
         )
 
     df, report = clean_dataset(raw_df)
@@ -332,22 +385,7 @@ def refresh_predictions(teacher_id, predict_fn, student_id=None):
         if df.empty:
             return 0
     res = predict_fn(df)
-    rows = [
-        {"label": l, "conf": c, "par": p, "sid": sid, "tid": teacher_id}
-        for l, c, p, sid in zip(res["labels"], res["confidences"], res["prob_at_risk"], df[ID_COLUMN])
-    ]
-    engine = get_engine()
-    with engine.begin() as conn:
-        for r in rows:
-            conn.execute(
-                text(
-                    "UPDATE students SET predicted_class = :label, prediction_confidence = :conf, "
-                    "prob_at_risk = :par WHERE student_id = :sid "
-                    "AND upload_id IN (SELECT id FROM uploads WHERE uploaded_by = :tid)"
-                ),
-                r,
-            )
-    return len(rows)
+    return _store_predictions(teacher_id, df[ID_COLUMN], res)
 
 
 def get_upload_history(teacher_id, limit=10):
@@ -419,30 +457,27 @@ def _num(v):
 
 
 def gwa_value(row):
-    """The GWA shown in tables: annual GWA if available, else 1st-semester GWA."""
-    for col in ("gwa", "first_sem_gwa"):
-        v = _num(row.get(col)) if col in row.index else None
-        if v is not None:
-            return round(v, 2)
-    return None
+    """The GWA shown in tables: the 1st-semester GWA (the model's main input)."""
+    v = _num(row.get("first_sem_gwa")) if "first_sem_gwa" in row.index else None
+    return round(v, 2) if v is not None else None
 
 
 def gwa_series(df):
-    if "gwa" in df.columns:
-        s = pd.to_numeric(df["gwa"], errors="coerce")
-        if "first_sem_gwa" in df.columns:
-            s = s.fillna(pd.to_numeric(df["first_sem_gwa"], errors="coerce"))
-        return s
     if "first_sem_gwa" in df.columns:
         return pd.to_numeric(df["first_sem_gwa"], errors="coerce")
     return None
 
 
-def attendance_pct(value):
+def gwa_band(value):
+    """Where a 1st-semester GWA falls on the study's operational cut-offs."""
     v = _num(value)
     if v is None:
         return None
-    return round(v * 100, 1) if v <= 1.5 else round(v, 1)
+    if v <= 82:
+        return "82 or below (the At-Risk range)"
+    if v >= 90:
+        return "90 or above (the High-Performing range)"
+    return "between 82 and 90 (the Stable range)"
 
 
 def status_badge(label):
@@ -454,22 +489,6 @@ def status_badge(label):
     if label == AT_RISK:
         return (AT_RISK, "badge-danger")
     return ("Unclassified", "badge-warning")
-
-
-def lms_activity_level(value, df=None):
-    """Low / Medium / High from lms_login_count using dataset tertiles."""
-    v = _num(value)
-    if v is None:
-        return "Unknown"
-    if df is not None and "lms_login_count" in df.columns and len(df) >= 3:
-        low_cut, high_cut = pd.to_numeric(df["lms_login_count"], errors="coerce").quantile([0.33, 0.66])
-    else:
-        low_cut, high_cut = 110, 190
-    if v <= low_cut:
-        return "Low"
-    if v <= high_cut:
-        return "Medium"
-    return "High"
 
 
 # --------------------------------------------------------------------------
@@ -548,30 +567,11 @@ def get_student_row(df, student_id):
 EDITABLE_COLUMNS = [c for c in SCHEMA_COLUMNS if c != ID_COLUMN]
 
 FIELD_METADATA = {
-    "academic_year": {"label": "Academic Year", "type": "text"},
-    "semester": {"label": "Semester", "type": "text"},
     "program": {"label": "Program", "type": "select", "options": ["BSCS", "BSIT", "BMMA"]},
     "year_level": {"label": "Year Level", "type": "select", "options": ["1", "2", "3", "4"]},
-    "gwa": {"label": "Annual GWA", "type": "number", "step": "0.01"},
-    "first_sem_gwa": {"label": "1st-Semester GWA (Previous GWA)", "type": "number", "step": "0.01"},
-    "assignment_average": {"label": "Assignment Average", "type": "number", "step": "0.01"},
-    "second_sem_gwa": {"label": "2nd-Semester GWA", "type": "number", "step": "0.01"},
-    "total_classes": {"label": "Total Classes", "type": "number", "step": "1"},
-    "classes_attended": {"label": "Classes Attended", "type": "number", "step": "1"},
-    "absences": {"label": "Absences", "type": "number", "step": "1"},
-    "attendance_rate": {"label": "Attendance Rate (0–1)", "type": "number", "step": "0.0001"},
-    "absenteeism_rate": {"label": "Absenteeism Rate (0–1)", "type": "number", "step": "0.0001"},
-    "lms_login_count": {"label": "LMS Login Count", "type": "number", "step": "1"},
-    "lms_resource_views": {"label": "LMS Resource Views", "type": "number", "step": "1"},
-    "lms_assignment_submissions": {"label": "LMS Assignment Submissions", "type": "number", "step": "1"},
-    "on_time_submissions": {"label": "On-Time Submissions", "type": "number", "step": "1"},
-    "late_submissions": {"label": "Late Submissions", "type": "number", "step": "1"},
-    "lms_activity_count": {"label": "LMS Activity Count", "type": "number", "step": "1"},
-    "avg_weekly_lms_logins": {"label": "Avg. Weekly LMS Logins", "type": "number", "step": "0.01"},
-    "avg_daily_activity": {"label": "Avg. Daily LMS Activity", "type": "number", "step": "0.01"},
-    "first_activity_date": {"label": "First LMS Activity Date", "type": "date"},
-    "last_activity_date": {"label": "Last LMS Activity Date", "type": "date"},
-    "target_class": {"label": "Recorded Class (target_class)", "type": "select", "options": CLASS_ORDER},
+    "first_sem_gwa": {"label": "1st-Semester GWA", "type": "number", "step": "0.01"},
+    "target_class": {"label": "Recorded Class (optional, not used by the model)", "type": "select",
+                     "options": CLASS_ORDER},
 }
 
 
@@ -654,37 +654,22 @@ def build_student_summary(row, df=None):
     """Everything the insights page needs about one student."""
     badge_text, badge_class = status_badge(row.get(STATUS_COLUMN))
     rec_text, rec_class = status_badge(row.get(TARGET_COLUMN))
-
-    components = []
-    for col, label_name in (("first_sem_gwa", "1st-Semester GWA"), ("second_sem_gwa", "2nd-Semester GWA"),
-                            ("gwa", "Annual GWA"), ("assignment_average", "Assignment Average")):
-        val = _num(row.get(col)) if col in row.index else None
-        if val is not None:
-            components.append({
-                "label": label_name,
-                "value": round(val, 2),
-                "bar_class": "green" if val >= 90 else ("yellow" if val > 82 else "red"),
-            })
-
-    lms_logins = row.get("lms_login_count", None)
+    first = _num(row.get("first_sem_gwa"))
+    prob = _num(row.get("prob_at_risk"))
     return {
         "id": row.get(ID_COLUMN, "N/A"),
         "program": row.get("program") or "N/A",
         "year_level": row.get("year_level", "N/A"),
         "gwa": gwa_value(row),
         "average": gwa_value(row),
-        "first_sem_gwa": _num(row.get("first_sem_gwa")),
-        "second_sem_gwa": _num(row.get("second_sem_gwa")),
-        "attendance": attendance_pct(row.get("attendance_rate")),
-        "absences": _num(row.get("absences")),
-        "total_classes": _num(row.get("total_classes")),
-        "lms_logins": _num(lms_logins),
-        "lms_activity": lms_activity_level(lms_logins, df),
+        "first_sem_gwa": first,
+        "gwa_band": gwa_band(first),
+        "gwa_bar_class": None if first is None else ("green" if first >= 90 else ("yellow" if first > 82 else "red")),
+        "prob_at_risk": prob,
         "status_text": badge_text,
         "status_class": badge_class,
         "recorded_text": rec_text if row.get(TARGET_COLUMN) else None,
         "recorded_class": rec_class,
-        "components": components,
         "raw": row,
     }
 
@@ -693,16 +678,20 @@ def build_student_summary(row, df=None):
 # Analytics
 # --------------------------------------------------------------------------
 
+def _class_crosstab(df, by):
+    tab = pd.crosstab(by, df[STATUS_COLUMN])
+    out = {c: [int(tab.loc[i, c]) if c in tab.columns else 0 for i in tab.index] for c in CLASS_ORDER}
+    return tab, out
+
+
 def build_analytics(df):
     if df is None:
         return None
 
     gwa = gwa_series(df)
     avg_grade = round(float(gwa.mean()), 2) if gwa is not None and gwa.notna().any() else None
-    avg_attendance = None
-    if "attendance_rate" in df.columns:
-        att = pd.to_numeric(df["attendance_rate"], errors="coerce").map(attendance_pct)
-        avg_attendance = round(float(att.mean()), 1) if att.notna().any() else None
+    prob = pd.to_numeric(df["prob_at_risk"], errors="coerce") if "prob_at_risk" in df.columns else None
+    avg_prob_at_risk = round(float(prob.mean()), 1) if prob is not None and prob.notna().any() else None
 
     counts = df[STATUS_COLUMN].value_counts()
     performance_counts = {c: int(counts.get(c, 0)) for c in CLASS_ORDER if counts.get(c, 0)}
@@ -723,30 +712,23 @@ def build_analytics(df):
             agree = (both["predicted_class"] == both[TARGET_COLUMN]).mean() * 100
             ai_summary.append(
                 f"The AI prediction matches the recorded class for {agree:.1f}% of the {len(both)} labeled "
-                f"students. The deployed model was refit on the full training data, so this is NOT a test "
-                f"score — see the Model Card for the held-out results."
+                f"students. If these students were part of the training data this is NOT a test score - "
+                f"see the Model Card for the held-out and cross-validated results."
             )
     if gwa is not None and "program" in df.columns:
         by_prog = gwa.groupby(df["program"]).mean().dropna()
         if len(by_prog) > 1:
             ai_summary.append(
-                f"Average GWA is highest in {by_prog.idxmax()} ({by_prog.max():.2f}) and lowest in "
+                f"Average 1st-semester GWA is highest in {by_prog.idxmax()} ({by_prog.max():.2f}) and lowest in "
                 f"{by_prog.idxmin()} ({by_prog.min():.2f})."
             )
-    if "first_sem_gwa" in df.columns and "second_sem_gwa" in df.columns:
-        change = (pd.to_numeric(df["second_sem_gwa"], errors="coerce")
-                  - pd.to_numeric(df["first_sem_gwa"], errors="coerce")).dropna()
-        if len(change):
+    if prob is not None and STATUS_COLUMN in df.columns:
+        watch = int(((df[STATUS_COLUMN] == STABLE) & (prob >= EARLY_WARNING_PROB)).sum())
+        if watch:
             ai_summary.append(
-                f"{(change < 0).mean() * 100:.1f}% of students had a lower 2nd-semester GWA than their "
-                f"1st-semester GWA — an observed pattern, not a proven cause."
+                f"{watch} Stable student(s) still have an At-Risk probability of {EARLY_WARNING_PROB:g}% or more "
+                f"- worth a light check-in (see Recommendations)."
             )
-
-    attendance_by_year = {}
-    if "year_level" in df.columns and "attendance_rate" in df.columns:
-        att = pd.to_numeric(df["attendance_rate"], errors="coerce").map(attendance_pct)
-        grouped = att.groupby(pd.to_numeric(df["year_level"], errors="coerce")).mean().round(1)
-        attendance_by_year = {f"Year {int(k)}": float(v) for k, v in grouped.items() if pd.notna(v)}
 
     gwa_by_program = {}
     if gwa is not None and "program" in df.columns:
@@ -755,20 +737,25 @@ def build_analytics(df):
 
     class_by_program = {}
     if "program" in df.columns:
-        tab = pd.crosstab(df["program"], df[STATUS_COLUMN])
-        for c in CLASS_ORDER:
-            class_by_program[c] = [int(tab.loc[p, c]) if c in tab.columns else 0 for p in tab.index]
+        tab, class_by_program = _class_crosstab(df, df["program"])
         class_by_program["_programs"] = [str(p) for p in tab.index]
+
+    class_by_year = {}
+    if "year_level" in df.columns:
+        years = pd.to_numeric(df["year_level"], errors="coerce")
+        tab, class_by_year = _class_crosstab(df, years)
+        class_by_year["_years"] = [f"Year {int(y)}" for y in tab.index]
 
     return {
         "avg_grade": avg_grade,
-        "avg_attendance": avg_attendance,
+        "avg_prob_at_risk": avg_prob_at_risk,
+        "total": total,
         "at_risk_count": performance_counts.get(AT_RISK, 0),
         "performance_counts": performance_counts,
         "performance_colors": [LABEL_COLORS[c] for c in performance_counts],
-        "attendance_by_year": attendance_by_year,
         "gwa_by_program": gwa_by_program,
         "class_by_program": class_by_program,
+        "class_by_year": class_by_year,
         "ai_summary": ai_summary,
     }
 
@@ -808,21 +795,16 @@ def build_risk_buckets(df):
 
 def build_enriched_dataframe(df, model_predict_batch_fn=None):
     """
-    Copy of df with computed columns: GWA, attendance %, LMS activity level,
-    and - if a batch prediction function is given - fresh predictions.
+    Copy of df with the AI's predicted class, confidence and At-Risk
+    probability (fresh, if a batch prediction function is given) plus the
+    GWA band each student falls into.
     """
     if df is None:
         return None
     export_df = df.drop(columns=[STATUS_COLUMN], errors="ignore").copy()
-    gwa = gwa_series(export_df)
-    if gwa is not None:
-        export_df["display_gwa"] = gwa.round(2)
-    if "attendance_rate" in export_df.columns:
-        export_df["attendance_pct"] = export_df["attendance_rate"].map(attendance_pct)
-    if "lms_login_count" in export_df.columns:
-        export_df["lms_activity_level"] = export_df["lms_login_count"].apply(
-            lambda v: lms_activity_level(v, export_df)
-        )
+    if "first_sem_gwa" in export_df.columns:
+        export_df["first_sem_gwa_band"] = export_df["first_sem_gwa"].map(
+            lambda v: (gwa_band(v) or "").split(" (")[0] or None)
     if model_predict_batch_fn is not None and not export_df.empty:
         res = model_predict_batch_fn(export_df)
         export_df["predicted_class"] = res["labels"]
