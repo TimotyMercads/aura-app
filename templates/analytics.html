@@ -1,9 +1,13 @@
 {% extends "base.html" %}
+{% from "_viz.html" import viz, viz_global %}
 {% block title %}Analytics{% endblock %}
 
 {% block content %}
 
-<h1 class="page-title">Analytics Dashboard</h1>
+<div class="page-head-row">
+    <h1 class="page-title">Analytics Dashboard</h1>
+    {{ viz_global() }}
+</div>
 
 <div class="cards">
     <div class="card">
@@ -23,13 +27,7 @@
 <div class="analytics-grid">
     <div class="graph-box">
         <h3>Student Performance Distribution</h3>
-        {% if charts and charts.performance_counts %}
-            <div class="chart-wrap">
-                <canvas id="perfDist"></canvas>
-            </div>
-        {% else %}
-            <div class="chart-placeholder">Upload a dataset to see this chart</div>
-        {% endif %}
+        {{ viz(vizs.dist) }}
     </div>
 
     <div class="summary-card">
@@ -47,36 +45,36 @@
 <div class="charts-grid-2 mb-20">
     <div class="graph-box">
         <h3>Classification by Year Level</h3>
-        {% if charts and charts.class_by_year and charts.class_by_year._years %}
-            <div class="chart-wrap chart-wrap-sm">
-                <canvas id="classByYear"></canvas>
-            </div>
-        {% else %}
-            <div class="chart-placeholder">Upload a dataset to see this chart</div>
-        {% endif %}
+        {{ viz(vizs.year) }}
     </div>
-
     <div class="graph-box">
         <h3>Classification by Program</h3>
-        {% if charts and charts.class_by_program and charts.class_by_program._programs %}
-            <div class="chart-wrap chart-wrap-sm">
-                <canvas id="classByProgram"></canvas>
-            </div>
-        {% else %}
-            <div class="chart-placeholder">Upload a dataset to see this chart</div>
-        {% endif %}
+        {{ viz(vizs.program) }}
     </div>
 </div>
 
-{% if top_features %}
-<div class="graph-box mb-20">
-    <h3>Top Predictors (from trained model)</h3>
-    <p class="text-muted mb-10">Mean absolute SHAP value across your students (all classes, log-odds units) — how strongly each of the model's three inputs moves the prediction on average.</p>
-    <div class="chart-wrap chart-wrap-sm">
-        <canvas id="topFeatures"></canvas>
+<div class="charts-grid-2 mb-20">
+    <div class="graph-box">
+        <h3>1st-Semester GWA Distribution</h3>
+        {{ viz(vizs.gwa_hist) }}
+    </div>
+    <div class="graph-box">
+        <h3>Average 1st-Semester GWA by Program</h3>
+        {{ viz(vizs.gwa_program) }}
     </div>
 </div>
-{% endif %}
+
+<div class="charts-grid-2 mb-20">
+    <div class="graph-box">
+        <h3>At-Risk Probability Spread</h3>
+        {{ viz(vizs.prob_hist) }}
+    </div>
+    <div class="graph-box">
+        <h3>Top Predictors (from trained model)</h3>
+        <p class="text-muted mb-10" style="font-size:12.5px;">Mean absolute SHAP value across your students (all classes, log-odds units) — how strongly each of the model's three inputs moves the prediction on average.</p>
+        {{ viz(vizs.importance, empty="Load the model and upload a dataset to see this chart") }}
+    </div>
+</div>
 
 {% if model_info %}
 {% set r = model_info.report %}
@@ -88,56 +86,27 @@
         {{ model_info.class_order | join(" / ") }} · explanations: {{ model_info.explainer }}.
     </p>
 
-    <h4 class="mt-20">Held-out test set{% if r %} ({{ r.dataset.test_students }} students){% endif %}</h4>
-    <p class="text-muted" style="font-size:12.5px;">
-        Evaluated once in the training notebook, before the deployed model was refit on all
-        {% if r %}{{ r.dataset.students }}{% endif %} students.
-    </p>
-    {% set m = model_info.test_metrics %}
-    <div class="model-metrics">
-        {% for key in ["Accuracy", "F1 (macro)", "MCC", "ROC-AUC (OvR macro)", "Recall (macro)", "Specificity (macro)", "At-Risk Recall", "At-Risk Precision"] %}
-            {% if m.get(key) is not none %}
-            <div class="model-metric"><span>{{ key }}</span><strong>{{ "%.3f"|format(m[key]) }}</strong></div>
+    <div class="charts-grid-2 mt-20">
+        <div>
+            <h4>Held-out test set{% if r %} ({{ r.dataset.test_students }} students){% endif %}</h4>
+            <p class="text-muted mb-10" style="font-size:12.5px;">Evaluated once in the training notebook, before the deployed model was refit on all {% if r %}{{ r.dataset.students }} {% endif %}students.</p>
+            {{ viz(vizs.test) }}
+        </div>
+        <div>
+            {% if r and vizs.cv %}
+            <h4>Repeated cross-validation</h4>
+            <p class="text-muted mb-10" style="font-size:12.5px;">{{ r.cv_scheme }} — the steadier estimate.</p>
+            {{ viz(vizs.cv) }}
             {% endif %}
-        {% endfor %}
-    </div>
-    <p class="text-muted mt-10" style="font-size:12px;">
-        The test set contained only {{ r.dataset.test_at_risk if r else "a few" }} At-Risk students, so one student
-        changes At-Risk recall by {{ (100 / r.dataset.test_at_risk) | round | int if r and r.dataset.test_at_risk else "many" }} points.
-        The cross-validated figures below are the steadier estimate.
-    </p>
-
-    {% if r and r.repeated_cv_all and r.repeated_cv_all.get(model_info.selected_model) %}
-    {% set cv = r.repeated_cv_all[model_info.selected_model] %}
-    <h4 class="mt-30">Repeated cross-validation — {{ r.cv_scheme }}</h4>
-    <div class="model-metrics">
-        {% for key in ["F1 (macro)", "MCC", "Accuracy", "At-Risk Recall", "At-Risk Precision"] %}
-            {% if cv.get(key) %}
-            <div class="model-metric"><span>{{ key }}</span><strong>{{ "%.3f"|format(cv[key][0]) }}</strong><em>± {{ "%.3f"|format(cv[key][1]) }}</em></div>
-            {% endif %}
-        {% endfor %}
+        </div>
     </div>
 
+    {% if r and vizs.compare %}
     <h4 class="mt-30">Compared with the other models and the rule-based baseline</h4>
-    <p class="text-muted" style="font-size:12.5px;">
+    <p class="text-muted mb-10" style="font-size:12.5px;">
         Same {{ r.cv_scheme }}. The rule baseline applies the label cut-offs (82 / 90) directly to the 1st-semester GWA, with no learning.
     </p>
-    <div class="table-scroll-x">
-    <table class="columns-table">
-        <thead><tr><th>Model</th><th>Macro-F1</th><th>At-Risk Recall</th><th>At-Risk Precision</th><th>Accuracy</th></tr></thead>
-        <tbody>
-        {% for name, row in r.repeated_cv_all.items() | sort(attribute="1.F1 (macro).0", reverse=True) %}
-            <tr class="{{ 'row-selected' if name == model_info.selected_model }}">
-                <td>{{ name }}{% if name == model_info.selected_model %} <span class="badge badge-success">selected</span>{% elif name == r.rule_name %} <span class="badge badge-info">baseline</span>{% endif %}</td>
-                <td>{{ "%.3f"|format(row["F1 (macro)"][0]) }}</td>
-                <td>{{ "%.3f"|format(row["At-Risk Recall"][0]) }}</td>
-                <td>{{ "%.3f"|format(row["At-Risk Precision"][0]) }}</td>
-                <td>{{ "%.3f"|format(row["Accuracy"][0]) }}</td>
-            </tr>
-        {% endfor %}
-        </tbody>
-    </table>
-    </div>
+    {{ viz(vizs.compare) }}
     {% if r.vs_rule %}
     {% set f = r.vs_rule["F1 (macro)"] %}{% set rr = r.vs_rule["At-Risk Recall"] %}
     <p class="text-muted mt-10" style="font-size:12.5px;">
@@ -149,6 +118,7 @@
         class probabilities and per-student explanations that a fixed cut-off cannot give.
     </p>
     {% endif %}
+
 
     <h4 class="mt-30">What the model does not use</h4>
     <ul class="model-file-list">
@@ -164,7 +134,7 @@
         <li>Not used because no institutional source exists: <strong>attendance, assignment and LMS columns</strong> (simulated in the dataset).</li>
         {% endif %}
     </ul>
-    {% else %}
+    {% elif not r %}
     <p class="text-muted mt-20" style="font-size:12px;">
         Add <code>models/AURA_model_report.json</code> (exported by the notebook) to also show the repeated
         cross-validation and rule-baseline comparison here.
@@ -174,106 +144,4 @@
 </div>
 {% endif %}
 
-{% endblock %}
-
-{% block scripts %}
-{% if charts or top_features %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script>
-Chart.defaults.color = '#93A1BC';
-Chart.defaults.font.family = "'Poppins', sans-serif";
-</script>
-{% endif %}
-{% if charts %}
-<script>
-{% if charts.performance_counts %}
-new Chart(document.getElementById('perfDist'), {
-    type: 'doughnut',
-    data: {
-        labels: {{ charts.performance_counts.keys() | list | tojson }},
-        datasets: [{
-            data: {{ charts.performance_counts.values() | list | tojson }},
-            backgroundColor: {{ charts.performance_colors | tojson }},
-            borderColor: '#1B3358',
-            borderWidth: 2
-        }]
-    },
-    options: {
-        maintainAspectRatio: false,
-        plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 14 } } }
-    }
-});
-{% endif %}
-
-{% if charts.class_by_year and charts.class_by_year._years %}
-new Chart(document.getElementById('classByYear'), {
-    type: 'bar',
-    data: {
-        labels: {{ charts.class_by_year._years | tojson }},
-        datasets: [
-            { label: 'At-Risk', data: {{ charts.class_by_year['At-Risk'] | tojson }}, backgroundColor: '#9C3A56', borderRadius: 4 },
-            { label: 'Stable', data: {{ charts.class_by_year['Stable'] | tojson }}, backgroundColor: '#3E6FA8', borderRadius: 4 },
-            { label: 'High-Performing', data: {{ charts.class_by_year['High-Performing'] | tojson }}, backgroundColor: '#57B27F', borderRadius: 4 }
-        ]
-    },
-    options: {
-        maintainAspectRatio: false,
-        plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 14 } } },
-        scales: {
-            x: { stacked: true, grid: { display: false } },
-            y: { stacked: true, grid: { color: 'rgba(255,255,255,.06)' } }
-        }
-    }
-});
-{% endif %}
-
-{% if charts.class_by_program and charts.class_by_program._programs %}
-new Chart(document.getElementById('classByProgram'), {
-    type: 'bar',
-    data: {
-        labels: {{ charts.class_by_program._programs | tojson }},
-        datasets: [
-            { label: 'At-Risk', data: {{ charts.class_by_program['At-Risk'] | tojson }}, backgroundColor: '#9C3A56', borderRadius: 4 },
-            { label: 'Stable', data: {{ charts.class_by_program['Stable'] | tojson }}, backgroundColor: '#3E6FA8', borderRadius: 4 },
-            { label: 'High-Performing', data: {{ charts.class_by_program['High-Performing'] | tojson }}, backgroundColor: '#57B27F', borderRadius: 4 }
-        ]
-    },
-    options: {
-        maintainAspectRatio: false,
-        plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 14 } } },
-        scales: {
-            x: { stacked: true, grid: { display: false } },
-            y: { stacked: true, grid: { color: 'rgba(255,255,255,.06)' } }
-        }
-    }
-});
-{% endif %}
-</script>
-{% endif %}
-
-{% if top_features %}
-<script>
-new Chart(document.getElementById('topFeatures'), {
-    type: 'bar',
-    data: {
-        labels: {{ top_features | map(attribute=0) | list | tojson }},
-        datasets: [{
-            label: 'mean |SHAP|',
-            data: {{ top_features | map(attribute=1) | list | tojson }},
-            backgroundColor: '#D4A73D',
-            borderRadius: 6
-        }]
-    },
-    options: {
-        maintainAspectRatio: false,
-        indexAxis: 'y',
-        plugins: { legend: { display: false } },
-        scales: {
-            x: { grid: { color: 'rgba(255,255,255,.06)' } },
-            y: { grid: { display: false } }
-        }
-    }
-});
-</script>
-{% endif %}
 {% endblock %}

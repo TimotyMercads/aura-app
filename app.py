@@ -40,7 +40,7 @@ from flask_login import (
 from sqlalchemy.exc import OperationalError
 
 from services import data_service, model_service, auth_service, intervention_service, action_plan_service
-from utils import intervention_policy, plain_language
+from utils import intervention_policy, plain_language, viz
 from utils.cleaning import total_changes, REQUIRED_COLUMNS, OPTIONAL_COLUMNS, KNOWN_PROGRAMS
 
 app = Flask(__name__)
@@ -198,10 +198,15 @@ def dashboard():
     df = _load(teacher_id)
     stats = data_service.compute_dashboard_stats(df)
     students = data_service.get_recent_students(df, n=5)
+    dist_viz = None
+    if stats.get("high_performing") is not None:
+        dist_viz = viz.class_distribution("dash-dist", {
+            "At-Risk": stats["at_risk"], "Stable": stats["stable"], "High-Performing": stats["high_performing"]})
     return render_template(
         "dashboard.html",
         stats=stats,
         students=students,
+        dist_viz=dist_viz,
         **_common_context("dashboard"),
     )
 
@@ -258,9 +263,14 @@ def student_insight(student_id):
     stage_info = intervention_policy.STAGES.get(stage_num) if stage_num else None
     factor_actions = intervention_policy.explanation_recommendations(display_label, explanation)
     general_suggestions = intervention_policy.SUGGESTIONS_BY_LABEL.get(display_label, [])
+    prob_viz = viz.class_probabilities("ins-prob", prediction.get("probabilities")) \
+        if prediction and not prediction.get("error") else None
+    factor_viz = viz.factor_shares("ins-factors", explanation)
 
     return render_template(
         "insights.html",
+        prob_viz=prob_viz,
+        factor_viz=factor_viz,
         student=student,
         prediction=prediction,
         explanation=explanation,
@@ -338,6 +348,8 @@ def student_explanation(student_id):
 
     return render_template(
         "explanation.html",
+        contrib_viz=viz.signed_contributions("exp-contrib", explanation),
+        share_viz=viz.factor_shares("exp-share", explanation),
         student=student,
         prediction=prediction,
         explanation=explanation,
@@ -435,6 +447,7 @@ def upload():
         model_info=model_service.model_info(),
         model_error=model_service.load_error(),
         clean_report=clean_report,
+        clean_viz=viz.cleaning_flow("upl-clean", clean_report),
         required_columns=REQUIRED_COLUMNS,
         optional_columns=OPTIONAL_COLUMNS,
         known_programs=KNOWN_PROGRAMS,
@@ -530,11 +543,28 @@ def analytics():
     df = _load(teacher_id)
     charts = data_service.build_analytics(df)
     top_features = model_service.global_importance(df) if model_service.is_ready() else None
+    info = model_service.model_info()
+    report = (info or {}).get("report") or {}
+    vizs = {}
+    if charts:
+        vizs["dist"] = viz.class_distribution("ana-dist", charts["performance_counts"], default="doughnut")
+        vizs["year"] = viz.class_crosstab("ana-year", charts["class_by_year"], "_years", "Classification by year level")
+        vizs["program"] = viz.class_crosstab("ana-program", charts["class_by_program"], "_programs", "Classification by program")
+        vizs["gwa_program"] = viz.gwa_by_group("ana-gwa-program", charts["gwa_by_program"], "Average 1st-semester GWA by program")
+        vizs["gwa_hist"] = viz.gwa_histogram("ana-gwa-hist", df)
+        vizs["prob_hist"] = viz.probability_histogram("ana-prob-hist", df)
+    vizs["importance"] = viz.feature_importance("ana-importance", top_features)
+    if info:
+        vizs["test"] = viz.test_metrics("ana-test", info.get("test_metrics"), (report.get("dataset") or {}).get("test_at_risk"))
+        cv_all = report.get("repeated_cv_all") or {}
+        vizs["cv"] = viz.cv_metrics("ana-cv", cv_all.get(info["selected_model"]))
+        vizs["compare"] = viz.model_comparison("ana-compare", cv_all, info["selected_model"], report.get("rule_name"))
     return render_template(
         "analytics.html",
         charts=charts,
         top_features=top_features,
-        model_info=model_service.model_info(),
+        vizs=vizs,
+        model_info=info,
         **_common_context("analytics"),
     )
 
@@ -546,9 +576,14 @@ def recommendations():
     df = _load(teacher_id)
     buckets = data_service.build_risk_buckets(df)
     action_items = action_plan_service.list_items(teacher_id)
+    rec_dist = viz.class_distribution("rec-dist", dict(zip(["At-Risk", "Stable", "High-Performing"], buckets["counts"])),
+                                      title="Students per pathway") if buckets else None
+    rec_prob = viz.probability_histogram("rec-prob", df)
     return render_template(
         "recommendations.html",
         buckets=buckets,
+        rec_dist=rec_dist,
+        rec_prob=rec_prob,
         stages=[intervention_policy.STAGE_1, intervention_policy.STAGE_2, intervention_policy.STAGE_3],
         stable_suggestions=intervention_policy.STABLE_SUGGESTIONS,
         high_performing_suggestions=intervention_policy.HIGH_PERFORMING_SUGGESTIONS,

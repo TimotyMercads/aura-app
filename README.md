@@ -31,6 +31,13 @@ and the updated `AURA-Final-Model-Training.ipynb`:
   1st-semester GWA sits on the 82 / 90 cut-offs, Analytics shows
   classification by year level instead of (simulated) attendance, and the
   policy stage is estimated from the 1st-semester GWA.
+- **Switchable visualizations** (evaluator feedback): every chart panel has a
+  **Chart / Statistics / Both** switch and a **chart-type** dropdown (bar,
+  horizontal bar, doughnut, pie, polar area, line, radar, stacked / grouped),
+  limited to the types that fit the data. Analytics also has a page-wide
+  switch. New panels: 1st-semester GWA distribution, average GWA by program,
+  At-Risk probability spread, model comparison, cleaning breakdown. Code:
+  `utils/viz.py`, `templates/_viz.html`, `static/js/aura-viz.js`.
 - Explanations use SHAP TreeExplainer if `shap` is installed, otherwise
   XGBoost's built-in TreeSHAP - the same exact values with less memory.
 

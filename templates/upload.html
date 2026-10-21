@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_viz.html" import viz %}
 {% block title %}Upload Dataset{% endblock %}
 
 {% block content %}
@@ -143,6 +144,7 @@
         {{ "{:,}".format(clean_report.original_rows or 0) }} rows in,
         {{ "{:,}".format(clean_report.final_rows or 0) }} rows out.
     </p>
+    {% if clean_viz %}<div class="mb-20">{{ viz(clean_viz) }}</div>{% endif %}
     <ul class="model-file-list">
         <li>Empty rows removed: <strong>{{ clean_report.empty_rows_removed }}</strong></li>
         <li>Exact duplicate rows removed: <strong>{{ clean_report.duplicate_rows_removed }}</strong></li>

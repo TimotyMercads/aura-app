@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_viz.html" import viz %}
 {% block title %}Student Insights{% endblock %}
 
 {% block content %}
@@ -41,6 +42,9 @@
         <span class="text-muted"> (recorded class from the uploaded file — load the model for a live prediction)</span>
     {% endif %}
 
+    {% if prob_viz %}
+    <div class="mt-20">{{ viz(prob_viz) }}</div>
+    {% endif %}
     {% if prediction and prediction.probabilities %}
     <div class="prob-row">
         {% for label, p in prediction.probabilities.items() %}
@@ -61,15 +65,7 @@
     <h3 class="mb-20">Key Factors</h3>
     {% if explanation %}
         <p class="text-muted mb-20">How much each of the model's three inputs influenced this prediction ({{ explanation.method }}).</p>
-        {% set bar_colors = ["red", "yellow", "purple", "green"] %}
-        {% for group, pct in explanation.groups.items() %}
-        <div class="progress-item">
-            <label>{{ group }}</label>
-            <div class="progress-bar">
-                <div class="progress {{ bar_colors[loop.index0 % 4] }}" style="width:{{ pct }}%;"></div>
-            </div>
-        </div>
-        {% endfor %}
+        {{ viz(factor_viz) }}
     {% else %}
         <p class="text-muted">
             Key factor weighting needs the trained model (<code>models/AURA_model_bundle.joblib</code>).

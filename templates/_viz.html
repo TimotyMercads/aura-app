@@ -1,0 +1,27 @@
+{#
+  Switchable visualization panel (chart / statistics / both + chart type).
+  Config comes from utils/viz.py; static/js/aura-viz.js renders it.
+  Usage:  {% from "_viz.html" import viz, viz_global %}  ...  {{ viz(cfg) }}
+#}
+{% macro viz(cfg, empty="Upload a dataset to see this chart") -%}
+{% if cfg %}
+<div class="viz" id="viz-{{ cfg.id }}" data-viz='{{ cfg | tojson }}'>
+    <noscript>
+        <table class="columns-table">
+            <thead><tr><th></th>{% for s in cfg.series %}<th>{{ s.name }}</th>{% endfor %}</tr></thead>
+            <tbody>
+            {% for label in cfg.labels %}{% set i = loop.index0 %}
+                <tr><td>{{ label }}</td>{% for s in cfg.series %}<td>{{ s.data[i] }}</td>{% endfor %}</tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </noscript>
+</div>
+{% else %}
+<div class="chart-placeholder">{{ empty }}</div>
+{% endif %}
+{%- endmacro %}
+
+{% macro viz_global() -%}
+<div class="viz-global" aria-label="Change every visual on this page"></div>
+{%- endmacro %}

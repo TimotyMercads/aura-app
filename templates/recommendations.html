@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_viz.html" import viz %}
 {% block title %}Recommendations{% endblock %}
 
 {% block content %}
@@ -23,6 +24,19 @@
         <h2>{{ buckets.counts[2] if buckets else "—" }}</h2>
     </div>
 </div>
+
+{% if rec_dist or rec_prob %}
+<div class="charts-grid-2 mb-20">
+    <div class="graph-box">
+        <h3>Students per Pathway</h3>
+        {{ viz(rec_dist) }}
+    </div>
+    <div class="graph-box">
+        <h3>At-Risk Probability Spread</h3>
+        {{ viz(rec_prob) }}
+    </div>
+</div>
+{% endif %}
 
 <div class="recommendations">
     {% for stage in stages %}

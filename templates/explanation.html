@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_viz.html" import viz %}
 {% block title %}Why This Prediction?{% endblock %}
 
 {% block content %}
@@ -25,6 +26,13 @@
     <div class="narrative-card">
         <h3>In short</h3>
         <p>{{ narrative }}</p>
+    </div>
+    {% endif %}
+
+    {% if share_viz %}
+    <div class="graph-box mt-20">
+        <h3 class="mb-10">At a glance</h3>
+        {{ viz(share_viz) }}
     </div>
     {% endif %}
 
@@ -76,6 +84,7 @@
             {{ explanation.base_value }}; positive values push toward {{ explanation.predicted_label }}.
             The three program columns (one-hot) are summed into one factor.
         </p>
+        {% if contrib_viz %}<div class="mb-20">{{ viz(contrib_viz) }}</div>{% endif %}
         <table class="tech-table">
             <thead>
                 <tr><th>Factor</th><th>Value</th><th>SHAP</th><th>Effect</th></tr>
