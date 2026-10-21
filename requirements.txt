@@ -9,8 +9,8 @@ joblib>=1.4
 openpyxl>=3.1
 # The selected model is XGBoost. "xgboost-cpu" is the same library without the
 # ~300 MB GPU add-on (smaller, faster Render builds); the bundle loads with either.
-# Tip: in Colab run  import xgboost; print(xgboost.__version__)  and pin that version here.
-xgboost-cpu>=2.1
+# The bundle was saved with XGBoost 3.4.1 (Colab), so install that version or newer.
+xgboost-cpu>=3.4.1
 # Exact SHAP explanations (TreeExplainer). Optional for XGBoost: without it the app
 # uses XGBoost's built-in TreeSHAP, which gives the same values with less memory.
 shap>=0.48
