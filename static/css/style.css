@@ -1458,13 +1458,8 @@ tbody tr:hover{
     font-size:16px;
 }
 
-.filter-form input[type="text"]{
-    width:180px;
-}
-
-.filter-form input[type="number"]{
-    width:110px;
-}
+.filter-form input[type="text"]{ width:auto; }
+.filter-form input[type="number"]{ width:auto; }
 
 /* ==========================
    SIDEBAR USER / LOGOUT
@@ -1977,28 +1972,27 @@ tbody tr:hover{
    topic per page, visible outlines, larger type.
 ========================================================== */
 
-html{ font-size:17px; }
-body{ font-size:16px; line-height:1.55; }
-p, li, td, th, label, input, select, textarea, button{ font-size:max(1em, 15.5px); }
+html{ font-size:16px; }
+body{ line-height:1.5; }
 .text-muted{ color:#AAB6CE; }                 /* higher contrast than before */
 
 /* ---- Sidebar: grouped, with a hint under each item ---- */
-.sidebar{ width:288px; padding:26px 16px; }
-.sidebar .logo{ font-size:28px; }
+.sidebar{ width:260px; padding:24px 14px; }
+.sidebar .logo{ font-size:26px; }
 .sidebar-tagline{ font-size:12.5px; margin-bottom:24px; }
 .side-nav{ display:flex; flex-direction:column; gap:4px; flex:1; }
 .nav-group-label{
-    margin:20px 6px 6px; font-size:13px; font-weight:700; letter-spacing:.1em;
+    margin:18px 8px 6px; font-size:12px; font-weight:700; letter-spacing:.12em;
     text-transform:uppercase; color:var(--gold-soft);
 }
 .nav-link{
     display:flex; align-items:center; gap:12px; position:relative;
-    padding:12px 14px; border-radius:12px; text-decoration:none;
-    color:var(--text-body); font-size:17px; font-weight:600;
+    padding:10px 12px; border-radius:10px; text-decoration:none;
+    color:var(--text-body); font-size:15.5px; font-weight:600;
     border:1.5px solid transparent; transition:.15s;
 }
-.nav-link small{ display:block; font-weight:400; font-size:13.5px; color:var(--text-muted); margin-top:1px; }
-.nav-ico{ font-size:22px; width:28px; text-align:center; flex-shrink:0; }
+.nav-link small{ display:block; font-weight:400; font-size:12.5px; color:var(--text-muted); margin-top:1px; }
+.nav-ico{ font-size:19px; width:26px; text-align:center; flex-shrink:0; }
 .nav-link:hover{ background:rgba(255,255,255,.07); border-color:rgba(255,255,255,.14); color:var(--white); }
 .nav-link.active{
     background:rgba(212,167,61,.16); border-color:var(--gold); color:var(--gold-soft);
@@ -2023,7 +2017,7 @@ p, li, td, th, label, input, select, textarea, button{ font-size:max(1em, 15.5px
 .topbar-user-role{ font-size:13px; }
 
 /* ---- Page header + breadcrumbs ---- */
-.main-content{ padding:24px 40px 64px; }
+.main-content{ padding:24px 36px 56px; }
 .page-header{ margin-bottom:20px; }
 .breadcrumbs{ display:flex; flex-wrap:wrap; align-items:center; gap:8px; font-size:15px; margin-bottom:10px; color:var(--text-muted); }
 .breadcrumbs a{ color:var(--harbor-soft); text-decoration:none; font-weight:600; }
@@ -2031,22 +2025,22 @@ p, li, td, th, label, input, select, textarea, button{ font-size:max(1em, 15.5px
 .breadcrumbs [aria-current]{ color:var(--white); font-weight:600; }
 .crumb-sep{ opacity:.6; }
 .page-header-row{ display:flex; justify-content:space-between; align-items:flex-start; gap:16px; flex-wrap:wrap; }
-.page-title{ font-size:34px; margin-bottom:6px; }
-.page-subtitle{ font-size:17px; color:#AAB6CE; max-width:760px; }
+.page-title{ font-size:28px; margin-bottom:4px; }
+.page-subtitle{ font-size:15.5px; color:#AAB6CE; max-width:760px; }
 .page-header-actions:empty{ display:none; }
 
 /* ---- Tabs: one topic at a time ---- */
 .tabs{
-    display:flex; flex-wrap:wrap; gap:10px; margin:18px 0 28px;
-    padding-bottom:14px; border-bottom:2px solid rgba(255,255,255,.12);
+    display:flex; flex-wrap:wrap; gap:8px; margin:14px 0 22px;
+    padding-bottom:12px; border-bottom:2px solid rgba(255,255,255,.12);
 }
 .tab{
-    display:flex; flex-direction:column; gap:2px; padding:12px 20px; min-width:170px;
+    display:flex; flex-direction:column; gap:2px; padding:9px 16px; min-width:150px;
     border:1.5px solid rgba(255,255,255,.2); border-radius:12px; text-decoration:none;
     background:rgba(255,255,255,.03); transition:.15s;
 }
-.tab-label{ font-size:18px; font-weight:700; color:var(--white); }
-.tab-hint{ font-size:14px; color:var(--text-muted); }
+.tab-label{ font-size:16px; font-weight:700; color:var(--white); }
+.tab-hint{ font-size:13px; color:var(--text-muted); }
 .tab:hover{ border-color:var(--gold-soft); background:rgba(255,255,255,.07); }
 .tab.active{ background:var(--gold); border-color:var(--gold); }
 .tab.active .tab-label{ color:var(--gold-ink); }
@@ -2058,17 +2052,17 @@ p, li, td, th, label, input, select, textarea, button{ font-size:max(1em, 15.5px
     border:1.5px solid rgba(255,255,255,.2) !important;
 }
 .card{ border-top-width:4px !important; }
-.graph-box, .summary-card, .table-container, .insight-card{ padding:26px; }
-.graph-box h3, .summary-card h3, .insight-card h3, .table-container h3{ font-size:22px; margin-bottom:14px; }
+.graph-box, .summary-card, .table-container, .insight-card{ padding:22px; }
+.graph-box h3, .summary-card h3, .insight-card h3, .table-container h3{ font-size:19px; margin-bottom:12px; }
 table{ border-collapse:collapse; }
-th, td{ padding:14px 16px; border-bottom:1px solid rgba(255,255,255,.14); }
-th{ font-size:14px; letter-spacing:.05em; text-transform:uppercase; color:var(--gold-soft); border-bottom:2px solid rgba(212,167,61,.5); }
-input, select, textarea{ border:1.5px solid rgba(255,255,255,.35); border-radius:10px; min-height:46px; }
+th, td{ padding:11px 14px; border-bottom:1px solid rgba(255,255,255,.14); }
+th{ font-size:13px; letter-spacing:.05em; text-transform:uppercase; color:var(--gold-soft); border-bottom:2px solid rgba(212,167,61,.5); }
+input, select, textarea{ border:1.5px solid rgba(255,255,255,.35); border-radius:10px; min-height:42px; }
 input:focus, select:focus, textarea:focus, a:focus-visible, button:focus-visible{ outline:3px solid var(--gold-soft); outline-offset:2px; }
-.btn, .btn-pill{ font-size:16px; padding:11px 22px; border-radius:11px; min-height:44px; }
+.btn, .btn-pill{ font-size:15px; padding:9px 20px; border-radius:10px; min-height:42px; display:inline-flex; align-items:center; justify-content:center; }
 .badge{ font-size:14px; padding:5px 12px; }
-.card h4{ font-size:16px; }
-.card h2{ font-size:40px; }
+.card h4{ font-size:14px; }
+.card h2{ font-size:32px; }
 .back-link{ font-size:16px; }
 
 /* Layout: spacing between sections so pages breathe */
@@ -2081,3 +2075,37 @@ input:focus, select:focus, textarea:focus, a:focus-visible, button:focus-visible
     .main-content{ padding:18px; }
     .tab{ min-width:calc(50% - 6px); }
 }
+
+
+/* ---- Filter / search bars: one tidy, evenly spaced row ---- */
+.search-box{ padding:16px 18px; border-radius:var(--radius); }
+.filter-form{ display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+.filter-form input, .filter-form select{ height:42px; min-height:42px; width:auto; flex:1 1 130px; max-width:200px; padding:0 12px; font-size:15px; border:1.5px solid transparent; }
+.filter-form .btn{ flex:0 0 auto; height:42px; }
+.search-box .text-muted, .search-box p{ font-size:14px; margin-top:12px; }
+
+/* ---- Login / signup: compact so the whole form fits on screen ---- */
+.login-body{ padding:16px; align-items:flex-start; }
+.login-card{ width:min(420px,100%); padding:24px 30px; margin:auto; }
+.login-crest img{ width:60px; height:60px; }
+.login-crest{ margin-bottom:10px; }
+.login-card h2{ font-size:22px; margin-bottom:14px; }
+.login-card label{ margin-top:10px; margin-bottom:4px; font-size:12px; }
+.login-card input{ height:42px; min-height:42px; padding:0 14px; font-size:15px; border-radius:10px; }
+.login-card button{ margin-top:18px; padding:0; height:44px; font-size:15px; }
+.login-footer{ margin-top:16px; padding-top:14px; }
+.login-footer p{ font-size:13px; margin-top:4px; }
+.forgot{ margin-top:10px; font-size:14px; }
+
+.login-body{ align-items:center; }
+.login-card{ margin:0; }
+.filter-form input, .filter-form select{ flex:1 1 110px; max-width:160px; }
+.filter-form .btn{ white-space:nowrap; padding:0 18px; }
+.page-header{ margin-bottom:12px; }
+.page-subtitle{ max-width:900px; }
+.filter-form{ gap:8px; flex-wrap:nowrap; }
+.filter-form input, .filter-form select{ flex:1 1 0; min-width:0; max-width:none; }
+.filter-form select{ padding:0 8px; }
+.search-box .text-muted, .search-box p{ font-size:13px; margin-top:8px; line-height:1.4; }
+.search-box{ padding:14px 16px; margin-bottom:14px; }
+@media (max-width:900px){ .filter-form{ flex-wrap:wrap; } .filter-form input, .filter-form select{ flex:1 1 140px; } }
