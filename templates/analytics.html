@@ -1,14 +1,20 @@
 {% extends "base.html" %}
 {% from "_viz.html" import viz, viz_global %}
+{% from "_layout.html" import page_header, tabs %}
 {% block title %}Analytics{% endblock %}
 
 {% block content %}
 
-<div class="page-head-row">
-    <h1 class="page-title">Analytics Dashboard</h1>
-    {{ viz_global() }}
-</div>
+{% call page_header("Analytics", "See how students are distributed and how the model performs. Pick a section below — one topic at a time.",
+        [("Dashboard", url_for("dashboard")), ("Analytics", None)]) %}{{ viz_global() }}{% endcall %}
 
+{{ tabs([
+    ("overview",   "Overview",   url_for("analytics", tab="overview"),   "The big picture"),
+    ("breakdowns", "Breakdowns", url_for("analytics", tab="breakdowns"), "By year, program, GWA"),
+    ("model",      "Model Card", url_for("analytics", tab="model"),      "How accurate is the AI?"),
+], tab) }}
+
+{% if tab == "overview" %}
 <div class="cards">
     <div class="card">
         <h4>📊 Average 1st-Sem GWA</h4>
@@ -42,6 +48,14 @@
     </div>
 </div>
 
+<div class="graph-box mb-20">
+    <h3>Top Predictors (from trained model)</h3>
+        <p class="text-muted mb-10" style="font-size:15px;">Mean absolute SHAP value across your students (all classes, log-odds units) — how strongly each of the model's three inputs moves the prediction on average.</p>
+        {{ viz(vizs.importance, empty="Load the model and upload a dataset to see this chart") }}
+</div>
+
+{% elif tab == "breakdowns" %}
+
 <div class="charts-grid-2 mb-20">
     <div class="graph-box">
         <h3>Classification by Year Level</h3>
@@ -64,17 +78,13 @@
     </div>
 </div>
 
-<div class="charts-grid-2 mb-20">
-    <div class="graph-box">
-        <h3>At-Risk Probability Spread</h3>
+<div class="graph-box mb-20">
+    <h3>At-Risk Probability Spread</h3>
         {{ viz(vizs.prob_hist) }}
     </div>
-    <div class="graph-box">
-        <h3>Top Predictors (from trained model)</h3>
-        <p class="text-muted mb-10" style="font-size:12.5px;">Mean absolute SHAP value across your students (all classes, log-odds units) — how strongly each of the model's three inputs moves the prediction on average.</p>
-        {{ viz(vizs.importance, empty="Load the model and upload a dataset to see this chart") }}
-    </div>
 </div>
+
+{% else %}
 
 {% if model_info %}
 {% set r = model_info.report %}
@@ -89,13 +99,13 @@
     <div class="charts-grid-2 mt-20">
         <div>
             <h4>Held-out test set{% if r %} ({{ r.dataset.test_students }} students){% endif %}</h4>
-            <p class="text-muted mb-10" style="font-size:12.5px;">Evaluated once in the training notebook, before the deployed model was refit on all {% if r %}{{ r.dataset.students }} {% endif %}students.</p>
+            <p class="text-muted mb-10" style="font-size:15px;">Evaluated once in the training notebook, before the deployed model was refit on all {% if r %}{{ r.dataset.students }} {% endif %}students.</p>
             {{ viz(vizs.test) }}
         </div>
         <div>
             {% if r and vizs.cv %}
             <h4>Repeated cross-validation</h4>
-            <p class="text-muted mb-10" style="font-size:12.5px;">{{ r.cv_scheme }} — the steadier estimate.</p>
+            <p class="text-muted mb-10" style="font-size:15px;">{{ r.cv_scheme }} — the steadier estimate.</p>
             {{ viz(vizs.cv) }}
             {% endif %}
         </div>
@@ -103,13 +113,13 @@
 
     {% if r and vizs.compare %}
     <h4 class="mt-30">Compared with the other models and the rule-based baseline</h4>
-    <p class="text-muted mb-10" style="font-size:12.5px;">
+    <p class="text-muted mb-10" style="font-size:15px;">
         Same {{ r.cv_scheme }}. The rule baseline applies the label cut-offs (82 / 90) directly to the 1st-semester GWA, with no learning.
     </p>
     {{ viz(vizs.compare) }}
     {% if r.vs_rule %}
     {% set f = r.vs_rule["F1 (macro)"] %}{% set rr = r.vs_rule["At-Risk Recall"] %}
-    <p class="text-muted mt-10" style="font-size:12.5px;">
+    <p class="text-muted mt-10" style="font-size:15px;">
         {{ model_info.selected_model }} vs the rule (corrected paired t-test): macro-F1 {{ "%+.3f"|format(f["difference vs rule"]) }}
         (95% CI {{ "%.3f"|format(f["95% CI low"]) }} to {{ "%.3f"|format(f["95% CI high"]) }}, p = {{ "%.2f"|format(f.p) }}),
         At-Risk recall {{ "%+.3f"|format(rr["difference vs rule"]) }} (p = {{ "%.2f"|format(rr.p) }}) — {{ f.verdict }}.
@@ -135,13 +145,17 @@
         {% endif %}
     </ul>
     {% elif not r %}
-    <p class="text-muted mt-20" style="font-size:12px;">
+    <p class="text-muted mt-20" style="font-size:14.5px;">
         Add <code>models/AURA_model_report.json</code> (exported by the notebook) to also show the repeated
         cross-validation and rule-baseline comparison here.
     </p>
     {% endif %}
-    <p class="text-muted mt-20" style="font-size:12px;">Treat At-Risk flags as prompts for a closer look, not conclusions.</p>
+    <p class="text-muted mt-20" style="font-size:14.5px;">Treat At-Risk flags as prompts for a closer look, not conclusions.</p>
 </div>
+{% else %}
+<div class="graph-box"><p class="text-muted">The trained model isn't loaded yet, so there is no Model Card to show. See <a href="{{ url_for('upload') }}">Upload Dataset → Model Files</a>.</p></div>
+{% endif %}
+
 {% endif %}
 
 {% endblock %}

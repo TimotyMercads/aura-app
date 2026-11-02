@@ -1,0 +1,45 @@
+{#
+  Shared page furniture so every page looks and behaves the same.
+    page_header(title, subtitle, crumbs)   crumbs = [(label, url), ..., (label, None)]
+    tabs(items, active)                    items  = [(key, label, url, hint)]
+#}
+{% macro page_header(title, subtitle=None, crumbs=None) -%}
+<header class="page-header">
+    {% if crumbs %}
+    <nav class="breadcrumbs" aria-label="Breadcrumb">
+        {% for label, url in crumbs %}
+            {% if url %}<a href="{{ url }}">{{ label }}</a><span class="crumb-sep" aria-hidden="true">›</span>
+            {% else %}<span aria-current="page">{{ label }}</span>{% endif %}
+        {% endfor %}
+    </nav>
+    {% endif %}
+    <div class="page-header-row">
+        <div>
+            <h1 class="page-title">{{ title }}</h1>
+            {% if subtitle %}<p class="page-subtitle">{{ subtitle }}</p>{% endif %}
+        </div>
+        <div class="page-header-actions">{{ caller() if caller else "" }}</div>
+    </div>
+</header>
+{%- endmacro %}
+
+{% macro tabs(items, active) -%}
+<nav class="tabs" aria-label="Sections of this page">
+    {% for key, label, url, hint in items %}
+    <a href="{{ url }}" class="tab {{ 'active' if key == active }}" {% if key == active %}aria-current="page"{% endif %}>
+        <span class="tab-label">{{ label }}</span>
+        {% if hint %}<span class="tab-hint">{{ hint }}</span>{% endif %}
+    </a>
+    {% endfor %}
+</nav>
+{%- endmacro %}
+
+{# Tabs shown on every page about one student, so you never lose your place. #}
+{% macro student_tabs(sid, active) -%}
+{{ tabs([
+    ("overview",    "Summary",       url_for("student_insight", student_id=sid),            "Prediction & key factors"),
+    ("explanation", "Why this?",     url_for("student_explanation", student_id=sid),        "How the AI decided"),
+    ("actions",     "What to do",    url_for("student_recommendations", student_id=sid),    "Policy steps & checklist"),
+    ("edit",        "Edit details",  url_for("student_edit", student_id=sid),               "Correct the record"),
+], active) }}
+{%- endmacro %}

@@ -1,12 +1,14 @@
 {% extends "base.html" %}
+{% from "_layout.html" import page_header, tabs, student_tabs %}
 {% from "_viz.html" import viz %}
 {% block title %}Why This Prediction?{% endblock %}
 
 {% block content %}
 
-<a href="{{ url_for('student_insight', student_id=student.id) }}" class="back-link">← Back to Student</a>
+{{ page_header("Why This Prediction?", "Student " ~ student.id ~ " — which inputs pushed the result, and by how much.",
+        [("Dashboard", url_for("dashboard")), ("Students", url_for("students")), (student.id, url_for("student_insight", student_id=student.id)), ("Why this?", None)]) }}
+{{ student_tabs(student.id, "explanation") }}
 
-<h1 class="page-title mb-10">Why This Prediction?</h1>
 <p class="text-muted mb-30">
     Written in plain language — this page is meant to be easy to read and share with
     parents, not just other teachers. No technical terms or raw statistics, just what's
@@ -61,7 +63,7 @@
     </details>
 
     <div class="graph-box mt-20">
-        <p class="text-muted" style="font-size:12.5px;">
+        <p class="text-muted" style="font-size:15px;">
             <strong>How to read this:</strong> each card under &ldquo;See each factor one by one&rdquo; is one factor the AI weighed when
             making its prediction for this student. "Major / Moderate / Minor" shows roughly how
             much that factor mattered compared to the others — it is not a grade or a score by

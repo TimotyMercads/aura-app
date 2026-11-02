@@ -536,9 +536,16 @@ def download_students_filtered():
     )
 
 
+ANALYTICS_TABS = ("overview", "breakdowns", "model")
+INTERVENTION_TABS = ("students", "policy", "plan")
+
+
 @app.route("/analytics")
 @login_required
 def analytics():
+    tab = request.args.get("tab", "overview")
+    if tab not in ANALYTICS_TABS:
+        tab = "overview"
     teacher_id = int(current_user.id)
     df = _load(teacher_id)
     charts = data_service.build_analytics(df)
@@ -565,25 +572,26 @@ def analytics():
         top_features=top_features,
         vizs=vizs,
         model_info=info,
+        tab=tab,
         **_common_context("analytics"),
     )
 
 
 @app.route("/recommendations")
+@app.route("/interventions")
 @login_required
 def recommendations():
+    tab = request.args.get("tab", "students")
+    if tab not in INTERVENTION_TABS:
+        tab = "students"
     teacher_id = int(current_user.id)
     df = _load(teacher_id)
     buckets = data_service.build_risk_buckets(df)
     action_items = action_plan_service.list_items(teacher_id)
-    rec_dist = viz.class_distribution("rec-dist", dict(zip(["At-Risk", "Stable", "High-Performing"], buckets["counts"])),
-                                      title="Students per pathway") if buckets else None
-    rec_prob = viz.probability_histogram("rec-prob", df)
     return render_template(
         "recommendations.html",
         buckets=buckets,
-        rec_dist=rec_dist,
-        rec_prob=rec_prob,
+        tab=tab,
         stages=[intervention_policy.STAGE_1, intervention_policy.STAGE_2, intervention_policy.STAGE_3],
         stable_suggestions=intervention_policy.STABLE_SUGGESTIONS,
         high_performing_suggestions=intervention_policy.HIGH_PERFORMING_SUGGESTIONS,
@@ -610,7 +618,7 @@ def action_plan_create():
         priority=priority, due_date=due_date, status=status,
     )
     flash("Action item added." if ok else "Please enter a title for the action item.", "success" if ok else "error")
-    return redirect(url_for("recommendations"))
+    return redirect(url_for("recommendations", tab="plan"))
 
 
 @app.route("/action-plan/<int:item_id>/status", methods=["POST"])
@@ -621,7 +629,7 @@ def action_plan_update_status(item_id):
     ok = action_plan_service.update_status(teacher_id, item_id, status)
     if not ok:
         flash("Could not update that action item.", "error")
-    return redirect(url_for("recommendations"))
+    return redirect(url_for("recommendations", tab="plan"))
 
 
 @app.route("/action-plan/<int:item_id>/delete", methods=["POST"])
@@ -629,7 +637,7 @@ def action_plan_update_status(item_id):
 def action_plan_delete(item_id):
     teacher_id = int(current_user.id)
     action_plan_service.delete_item(teacher_id, item_id)
-    return redirect(url_for("recommendations"))
+    return redirect(url_for("recommendations", tab="plan"))
 
 
 @app.route("/reload-model", methods=["POST"])

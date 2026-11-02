@@ -1,10 +1,12 @@
 {% extends "base.html" %}
 {% from "_viz.html" import viz %}
+{% from "_layout.html" import page_header %}
 {% block title %}Upload Dataset{% endblock %}
 
 {% block content %}
 
-<h1 class="page-title">Upload Dataset</h1>
+{{ page_header("Upload Dataset", "Step 1 — add your student file. AURA cleans it and predicts for you.",
+        [("Dashboard", url_for("dashboard")), ("Upload Dataset", None)]) }}
 
 <div class="upload-box" id="upload-box">
     <h2>Upload CSV or XLSX Dataset</h2>
@@ -75,7 +77,7 @@
         </tbody>
     </table>
     </div>
-    <p class="text-muted mt-20" style="font-size:12.5px;">
+    <p class="text-muted mt-20" style="font-size:15px;">
         Other columns (annual or 2nd-semester GWA, attendance, LMS activity, total classes, age, sex …) are ignored and
         listed in the cleaning report. Rows missing a model input are excluded rather than guessed (manuscript 3.2.3.2).
     </p>

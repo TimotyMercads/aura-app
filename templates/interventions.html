@@ -1,12 +1,14 @@
 {% extends "base.html" %}
+{% from "_layout.html" import page_header, tabs, student_tabs %}
 {% block title %}Intervention Recommendations{% endblock %}
 
 {% block content %}
 
-<a href="{{ url_for('student_insight', student_id=student.id) }}" class="back-link">← Back to Student</a>
+{{ page_header("What To Do", "Student " ~ student.id ~ " — intervention steps from AUF's Early Intervention and Academic Support policy.",
+        [("Dashboard", url_for("dashboard")), ("Students", url_for("students")), (student.id, url_for("student_insight", student_id=student.id)), ("What to do", None)]) }}
+{{ student_tabs(student.id, "actions") }}
 
 
-<h1 class="page-title mb-10">Intervention Recommendations</h1>
 <p class="text-muted mb-30">
     Based on AUF's approved <strong>Early Intervention and Academic Support for Students at Risk</strong>
     policy (Office of the VP for Academic Affairs, implemented January 25, 2024).

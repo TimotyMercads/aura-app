@@ -1,14 +1,19 @@
 {% extends "base.html" %}
-{% from "_viz.html" import viz %}
-{% block title %}Recommendations{% endblock %}
+{% from "_layout.html" import page_header, tabs %}
+{% block title %}Interventions{% endblock %}
 
 {% block content %}
 
-<h1 class="page-title">AI Intervention Recommendations</h1>
-<p class="text-muted mb-20">
-    Based on AUF's approved <strong>Early Intervention and Academic Support for Students at Risk</strong>
-    policy (Office of the VP for Academic Affairs, implemented January 25, 2024).
-</p>
+{{ page_header("Interventions", "Decide who needs help and what to do about it. This page is about action; charts and model results live under Analytics.",
+        [("Dashboard", url_for("dashboard")), ("Interventions", None)]) }}
+
+{{ tabs([
+    ("students", "Students to Support", url_for("recommendations", tab="students"), "At-Risk & early warnings"),
+    ("policy",   "Policy & Pathways",   url_for("recommendations", tab="policy"),   "AUF stages and suggestions"),
+    ("plan",     "My Action Plan",      url_for("recommendations", tab="plan"),     "Reminders & follow-ups"),
+], tab) }}
+
+{% if tab == "students" %}
 
 <div class="cards">
     <div class="card red">
@@ -22,71 +27,6 @@
     <div class="card green">
         <h4>High-Performing (Enrich)</h4>
         <h2>{{ buckets.counts[2] if buckets else "—" }}</h2>
-    </div>
-</div>
-
-{% if rec_dist or rec_prob %}
-<div class="charts-grid-2 mb-20">
-    <div class="graph-box">
-        <h3>Students per Pathway</h3>
-        {{ viz(rec_dist) }}
-    </div>
-    <div class="graph-box">
-        <h3>At-Risk Probability Spread</h3>
-        {{ viz(rec_prob) }}
-    </div>
-</div>
-{% endif %}
-
-<div class="recommendations">
-    {% for stage in stages %}
-    <div class="recommendation-box">
-        <h3>{{ stage.title.split("—")[0].strip() }}</h3>
-        <p class="policy-note mb-20">{{ stage.trigger }}</p>
-        <ul>
-            {% for step in stage.steps %}
-            <li>{{ step.title }}</li>
-            {% endfor %}
-        </ul>
-    </div>
-    {% endfor %}
-
-    <div class="recommendation-box">
-        <h3>AI Prediction Summary</h3>
-        {% if buckets %}
-        <p>
-            Of the currently loaded dataset, <strong>{{ buckets.counts[0] }}</strong> student(s)
-            are classified <strong>At-Risk</strong> and fall under the AUF policy,
-            <strong>{{ buckets.counts[1] }}</strong> are <strong>Stable</strong>
-            ({{ buckets.early_warning_count }} of them with an At-Risk probability of
-            {{ buckets.early_warning_threshold|int }}% or more), and
-            <strong>{{ buckets.counts[2] }}</strong> are <strong>High-Performing</strong>.
-        </p>
-        <br>
-        <p>Recommended follow-up every <strong>30 days</strong>. All recommendations are non-binding — the final decision stays with the educator.</p>
-        {% else %}
-        <p>Upload a dataset to generate a real prediction summary.</p>
-        {% endif %}
-    </div>
-
-    <div class="recommendation-box">
-        <h3>Monitoring Pathway (Stable)</h3>
-        <p class="policy-note mb-20">The study's own non-binding suggestions — not part of the AUF policy.</p>
-        <ul>
-            {% for sgt in stable_suggestions %}
-            <li>{{ sgt }}</li>
-            {% endfor %}
-        </ul>
-    </div>
-
-    <div class="recommendation-box">
-        <h3>Enrichment Pathway (High-Performing)</h3>
-        <p class="policy-note mb-20">From the manuscript's enrichment strategies — not part of the AUF at-risk policy.</p>
-        <ul>
-            {% for sgt in high_performing_suggestions %}
-            <li>{{ sgt }}</li>
-            {% endfor %}
-        </ul>
     </div>
 </div>
 
@@ -150,6 +90,62 @@
 </div>
 {% endif %}
 
+{% elif tab == "policy" %}
+
+<div class="recommendations">
+    {% for stage in stages %}
+    <div class="recommendation-box">
+        <h3>{{ stage.title.split("—")[0].strip() }}</h3>
+        <p class="policy-note mb-20">{{ stage.trigger }}</p>
+        <ul>
+            {% for step in stage.steps %}
+            <li>{{ step.title }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endfor %}
+
+    <div class="recommendation-box">
+        <h3>AI Prediction Summary</h3>
+        {% if buckets %}
+        <p>
+            Of the currently loaded dataset, <strong>{{ buckets.counts[0] }}</strong> student(s)
+            are classified <strong>At-Risk</strong> and fall under the AUF policy,
+            <strong>{{ buckets.counts[1] }}</strong> are <strong>Stable</strong>
+            ({{ buckets.early_warning_count }} of them with an At-Risk probability of
+            {{ buckets.early_warning_threshold|int }}% or more), and
+            <strong>{{ buckets.counts[2] }}</strong> are <strong>High-Performing</strong>.
+        </p>
+        <br>
+        <p>Recommended follow-up every <strong>30 days</strong>. All recommendations are non-binding — the final decision stays with the educator.</p>
+        {% else %}
+        <p>Upload a dataset to generate a real prediction summary.</p>
+        {% endif %}
+    </div>
+
+    <div class="recommendation-box">
+        <h3>Monitoring Pathway (Stable)</h3>
+        <p class="policy-note mb-20">The study's own non-binding suggestions — not part of the AUF policy.</p>
+        <ul>
+            {% for sgt in stable_suggestions %}
+            <li>{{ sgt }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+
+    <div class="recommendation-box">
+        <h3>Enrichment Pathway (High-Performing)</h3>
+        <p class="policy-note mb-20">From the manuscript's enrichment strategies — not part of the AUF at-risk policy.</p>
+        <ul>
+            {% for sgt in high_performing_suggestions %}
+            <li>{{ sgt }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+</div>
+
+{% else %}
+
 <div class="graph-box mt-30">
     <div class="card-header-row">
         <h3>Teacher Action Plan</h3>
@@ -195,7 +191,7 @@
                 <td>
                     {{ item.title }}
                     {% if item.is_overdue %}<span class="badge badge-danger ml-8">Overdue</span>{% elif item.is_due_soon %}<span class="badge badge-warning ml-8">Due Soon</span>{% endif %}
-                    {% if item.notes %}<div class="text-muted" style="font-size:12px; margin-top:3px;">{{ item.notes }}</div>{% endif %}
+                    {% if item.notes %}<div class="text-muted" style="font-size:14.5px; margin-top:3px;">{{ item.notes }}</div>{% endif %}
                 </td>
                 <td>{{ item.student_id or "—" }}</td>
                 <td>{{ item.due_date.strftime('%b %d, %Y') if item.due_date else "—" }}</td>
@@ -221,5 +217,7 @@
     <p class="text-muted">No action items yet — add one above to start tracking your reminders and follow-ups.</p>
     {% endif %}
 </div>
+
+{% endif %}
 
 {% endblock %}

@@ -1,13 +1,12 @@
 {% extends "base.html" %}
+{% from "_layout.html" import page_header, tabs, student_tabs %}
 {% block title %}Edit Student{% endblock %}
 
 {% block content %}
 
-<a href="{{ url_for('student_insight', student_id=student.id) }}" class="back-link">← Back to Student</a>
-
-<div class="flex-between mb-20">
-    <h1 class="page-title mb-0">Edit Student: {{ student.id }}</h1>
-</div>
+{{ page_header("Edit Details", "Student " ~ student.id ~ " — changes re-run the prediction automatically.",
+        [("Dashboard", url_for("dashboard")), ("Students", url_for("students")), (student.id, url_for("student_insight", student_id=student.id)), ("Edit", None)]) }}
+{{ student_tabs(student.id, "edit") }}
 
 <p class="text-muted mb-20">
     Changes save directly to your uploaded data, and the student is re-classified by the model right after saving.

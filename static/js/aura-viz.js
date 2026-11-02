@@ -158,7 +158,7 @@
             options.indexAxis = horizontal ? "y" : "x";
             options.scales = horizontal ? { x: valueAxis, y: catAxis } : { x: catAxis, y: valueAxis };
         } else if (cjsType === "radar") {
-            options.scales = { r: { angleLines: { color: GRID }, grid: { color: GRID }, pointLabels: { color: INK, font: { size: 11 } },
+            options.scales = { r: { angleLines: { color: GRID }, grid: { color: GRID }, pointLabels: { color: INK, font: { size: 13 } },
                 ticks: { color: MUTED, backdropColor: "transparent", showLabelBackdrop: false },
                 suggestedMin: cfg.min !== null && cfg.min !== undefined ? cfg.min : 0,
                 suggestedMax: cfg.max !== null && cfg.max !== undefined ? cfg.max : undefined } };

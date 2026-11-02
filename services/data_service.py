@@ -727,7 +727,7 @@ def build_analytics(df):
         if watch:
             ai_summary.append(
                 f"{watch} Stable student(s) still have an At-Risk probability of {EARLY_WARNING_PROB:g}% or more "
-                f"- worth a light check-in (see Recommendations)."
+                f"- worth a light check-in (see Interventions)."
             )
 
     gwa_by_program = {}

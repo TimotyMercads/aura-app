@@ -1,12 +1,12 @@
 {% extends "base.html" %}
+{% from "_layout.html" import page_header, tabs, student_tabs %}
 {% block title %}Students{% endblock %}
 {% block body_class %}page-fill{% endblock %}
 
 {% block content %}
 
-<div class="flex-between mb-30">
-    <h1 class="page-title">Students</h1>
-</div>
+{{ page_header("Students", "Search or filter the list, then click a student to see their prediction, the reasons behind it, and what to do next.",
+        [("Dashboard", url_for("dashboard")), ("Students", None)]) }}
 
 <div class="search-box">
     <form method="get" action="{{ url_for('students') }}" class="filter-form">
@@ -73,7 +73,7 @@
                 <td>{{ "%.2f"|format(s.gwa) if s.gwa is not none else "—" }}</td>
                 <td>
                     <span class="badge {{ s.status_class }}">{{ s.status_text }}</span>
-                    {% if s.confidence is not none %}<span class="text-muted ml-8" style="font-size:11.5px;">{{ s.confidence }}%</span>{% endif %}
+                    {% if s.confidence is not none %}<span class="text-muted ml-8" style="font-size:14px;">{{ s.confidence }}%</span>{% endif %}
                 </td>
                 <td><a href="{{ url_for('student_insight', student_id=s.id) }}" class="btn">View</a></td>
             </tr>

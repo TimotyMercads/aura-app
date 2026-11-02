@@ -17,13 +17,19 @@
     <aside class="sidebar">
         <div class="logo">AURA</div>
         <div class="sidebar-tagline">Angeles University Foundation</div>
-        <ul>
-            <li><a href="{{ url_for('dashboard') }}" class="{{ 'active' if active_page == 'dashboard' }}">🏠 Dashboard</a></li>
-            <li><a href="{{ url_for('students') }}" class="{{ 'active' if active_page == 'students' }}">👨‍🎓 Students</a></li>
-            <li><a href="{{ url_for('upload') }}" class="{{ 'active' if active_page == 'upload' }}">📂 Upload Dataset</a></li>
-            <li><a href="{{ url_for('analytics') }}" class="{{ 'active' if active_page == 'analytics' }}">📈 Analytics</a></li>
-            <li><a href="{{ url_for('recommendations') }}" class="{{ 'active' if active_page == 'recommendations' }}">🎯 Recommendations</a></li>
-        </ul>
+        <nav class="side-nav" aria-label="Main">
+            <a href="{{ url_for('dashboard') }}" class="nav-link nav-home {{ 'active' if active_page == 'dashboard' }}"><span class="nav-ico">🏠</span><span>Dashboard</span></a>
+
+            <div class="nav-group-label">1 · Data</div>
+            <a href="{{ url_for('upload') }}" class="nav-link {{ 'active' if active_page == 'upload' }}"><span class="nav-ico">📂</span><span>Upload Dataset<small>Add &amp; clean student data</small></span></a>
+            <a href="{{ url_for('students') }}" class="nav-link {{ 'active' if active_page == 'students' }}"><span class="nav-ico">👨‍🎓</span><span>Students<small>Browse &amp; open a student</small></span></a>
+
+            <div class="nav-group-label">2 · Understand</div>
+            <a href="{{ url_for('analytics') }}" class="nav-link {{ 'active' if active_page == 'analytics' }}"><span class="nav-ico">📈</span><span>Analytics<small>Charts &amp; model results</small></span></a>
+
+            <div class="nav-group-label">3 · Act</div>
+            <a href="{{ url_for('recommendations') }}" class="nav-link {{ 'active' if active_page == 'recommendations' }}"><span class="nav-ico">🎯</span><span>Interventions<small>Who to help &amp; how</small></span>{% if action_plan_alerts %}<b class="nav-badge" title="Action items due soon">{{ action_plan_alerts }}</b>{% endif %}</a>
+        </nav>
         {% if current_user.is_authenticated %}
         <div class="sidebar-user">
             <div class="sidebar-user-name">👤 {{ current_user.full_name }}</div>
