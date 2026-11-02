@@ -27,6 +27,17 @@ CLASS_ORDER = ["At-Risk", "Stable", "High-Performing"]
 CLASS_COLORS = {"At-Risk": "#C9567A", "Stable": "#5B8CC4", "High-Performing": "#4FA374"}
 METRIC_COLORS = ["#C98500", "#9085E9", "#D95926", "#199E70"]
 SINGLE = "#C98500"
+# One color per category when a single series shows different things (inputs, programs,
+# metrics), so each bar is told apart. Class colors (red/blue/green) stay reserved for classes.
+CATEGORY_COLORS = ["#C98500", "#9085E9", "#D95926", "#199E70", "#2FA4C7", "#B8689E", "#8FA33A", "#7A8AA0"]
+FEATURE_COLORS = {"1st-Semester GWA": "#C98500", "Year Level": "#9085E9", "Program": "#2FA4C7"}
+
+
+def _cats(labels, fixed=None):
+    out = []
+    for i, l in enumerate(labels):
+        out.append((fixed or {}).get(l) or CATEGORY_COLORS[i % len(CATEGORY_COLORS)])
+    return out
 TOWARD, AWAY = "#C98500", "#9085E9"     # SHAP: pushes toward / away from the predicted class
 
 # chart-type sets that make sense per data shape
@@ -116,7 +127,7 @@ def class_crosstab(pid, cross, label_key, title, default="stacked"):
 def gwa_by_group(pid, mapping, title):
     if not mapping:
         return None
-    return panel(pid, list(mapping.keys()), [{"name": "Average 1st-Sem GWA", "data": list(mapping.values())}],
+    return panel(pid, list(mapping.keys()), [{"name": "Average 1st-Sem GWA", "data": list(mapping.values()), "colors": _cats(list(mapping.keys()))}],
                  CATEGORY_VALUES, "bar", title=title, decimals=2, min_value=75, max_value=100,
                  value_label="Average GWA", stats_summary=True)
 
@@ -170,7 +181,8 @@ def feature_importance(pid, top_features, title="Top predictors"):
     """top_features = [(friendly_name, mean|SHAP|), ...]"""
     if not top_features:
         return None
-    return panel(pid, [n for n, _ in top_features], [{"name": "Mean |SHAP|", "data": [v for _, v in top_features]}],
+    return panel(pid, [n for n, _ in top_features], [{"name": "Mean |SHAP|", "data": [v for _, v in top_features],
+                  "colors": _cats([n for n, _ in top_features], FEATURE_COLORS)}],
                  ["hbar", "bar", "doughnut", "pie", "polarArea"], "hbar", title=title, decimals=4,
                  percent=True, value_label="Mean |SHAP|",
                  note="Share = this factor's part of the total influence across your students.")
@@ -184,7 +196,7 @@ def test_metrics(pid, metrics, n_at_risk=None):
     if not metrics:
         return None
     keys = [k for k in TEST_KEYS if metrics.get(k) is not None]
-    return panel(pid, keys, [{"name": "Held-out test", "data": [metrics[k] for k in keys]}],
+    return panel(pid, keys, [{"name": "Held-out test", "data": [metrics[k] for k in keys], "colors": _cats(keys)}],
                  SCORES, "bar", title="Held-out test set", decimals=3, min_value=0, max_value=1,
                  value_label="Score", stats_summary=False,
                  note=(f"Only {n_at_risk} At-Risk students were in the test set, so At-Risk recall/precision "
@@ -195,7 +207,7 @@ def cv_metrics(pid, cv):
     if not cv:
         return None
     keys = [k for k in ["F1 (macro)", "MCC", "Accuracy", "At-Risk Recall", "At-Risk Precision"] if cv.get(k)]
-    return panel(pid, keys, [{"name": "Mean of 50 folds", "data": [cv[k][0] for k in keys],
+    return panel(pid, keys, [{"name": "Mean of 50 folds", "data": [cv[k][0] for k in keys], "colors": _cats(keys),
                               "errors": [cv[k][1] for k in keys]}],
                  SCORES, "bar", title="Repeated cross-validation", decimals=3, min_value=0, max_value=1,
                  value_label="Mean", stats_summary=False,
@@ -242,7 +254,8 @@ def factor_shares(pid, explanation):
     rows = explanation["technical"]
     total = sum(abs(r["shap"]) for r in rows) or 1
     return panel(pid, [r["label"] for r in rows],
-                 [{"name": "Share of influence", "data": [abs(r["shap"]) / total * 100 for r in rows]}],
+                 [{"name": "Share of influence", "data": [abs(r["shap"]) / total * 100 for r in rows],
+                  "colors": _cats([r["label"] for r in rows], FEATURE_COLORS)}],
                  ["hbar", "bar", "doughnut", "pie", "polarArea"], "hbar",
                  title="How much each input influenced this prediction", unit="%", decimals=1,
                  value_label="Share of influence", stats_summary=False, height="xs")
@@ -278,7 +291,7 @@ def cleaning_flow(pid, report):
         ("Missing a model input", report.get("excluded_missing_critical", 0)),
     ]
     reasons = [(k, v) for k, v in reasons if v]
-    colors = ["#4FA374"] + [SINGLE] * (len(reasons) - 1)
+    colors = ["#4FA374"] + CATEGORY_COLORS[1:][: max(len(reasons) - 1, 0)]
     return panel(pid, [k for k, _ in reasons], [{"name": "Rows", "data": [v for _, v in reasons], "colors": colors}],
                  ["hbar", "bar", "doughnut", "pie"], "hbar", title="Where the uploaded rows went",
                  unit=" rows", percent=True, value_label="Rows", height="xs",

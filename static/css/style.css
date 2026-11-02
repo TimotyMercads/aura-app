@@ -1926,7 +1926,7 @@ tbody tr:hover{
 .gwa-scale{ position:relative; height:10px; border-radius:6px; margin:10px 0 6px;
     background:linear-gradient(90deg, var(--maroon-soft) 0%, var(--maroon-soft) 28%, var(--harbor) 28%, var(--harbor) 60%, var(--sage-soft) 60%, var(--sage-soft) 100%); }
 .gwa-scale-marker{ position:absolute; top:-5px; width:4px; height:20px; border-radius:2px; background:var(--gold-soft); box-shadow:0 0 0 2px var(--ink-navy); transform:translateX(-50%); }
-.gwa-scale-labels{ position:relative; height:16px; font-size:14px; color:var(--text-muted); }
+.gwa-scale-labels{ position:relative; height:24px; margin-bottom:6px; font-size:14px; color:var(--text-muted); }
 .gwa-scale-labels span{ position:absolute; top:0; transform:translateX(-50%); }
 .gwa-scale-labels span:first-child{ transform:none; }
 .gwa-scale-labels span:last-child{ transform:translateX(-100%); }
